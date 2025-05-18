@@ -15,7 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useToast } from '@/hooks/use-toast';
 import { publishStoryAction, deleteStoryAction, updateStoryCategoryAction, regenerateStoryImageAction, scheduleStoryPublicationAction } from '@/lib/actions';
 import { CheckCircle, Trash2, RefreshCw, Loader2, CalendarClock, Edit } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import {
   AlertDialog,
@@ -138,22 +138,40 @@ export function AdminStoryControls({ story: initialStory, onStoryUpdate }: Admin
     if (!dateString) return 'Zamanlanmamış';
     try {
       const date = parseISO(dateString);
+      if (!isValid(date)) return 'Geçersiz Tarih';
       let formatted = format(date, 'dd MMMM yyyy', { locale: tr });
       if (timeString) {
-        formatted += ` ${timeString}`;
+         // Ensure timeString is in HH:mm format
+        const timeParts = timeString.split(':');
+        if (timeParts.length === 2 && timeParts[0].length <= 2 && timeParts[1].length <= 2) {
+            const hours = timeParts[0].padStart(2, '0');
+            const minutes = timeParts[1].padStart(2, '0');
+            formatted += ` ${hours}:${minutes}`;
+        } else {
+            formatted += ` ${timeString}`; // Fallback if format is unexpected
+        }
       }
       return formatted;
     } catch (e) {
-      return 'Geçersiz Tarih';
+      console.error("AdminStoryControls - Tarih formatlama hatası:", e, dateString, timeString);
+      return 'Hatalı Tarih';
     }
   }
   
   const formatSimpleDate = (dateString?: string) => {
     if (!dateString) return 'N/A';
     try {
-      return format(parseISO(dateString), 'dd MMMM yyyy, HH:mm', {locale: tr});
+      const date = parseISO(dateString);
+      if(!isValid(date)) return 'Geçersiz Tarih';
+      return format(date, 'dd MMMM yyyy, HH:mm', {locale: tr});
     } catch (e) {
-       return new Date(dateString).toLocaleDateString('tr-TR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+       // Fallback for potentially different date string formats from older data
+       console.warn("AdminStoryControls - formatSimpleDate fallback parse for:", dateString, e);
+       const parsedDate = new Date(dateString);
+       if(isValid(parsedDate)) {
+        return format(parsedDate, 'dd MMMM yyyy, HH:mm', {locale: tr});
+       }
+       return 'Hatalı Tarih';
     }
   }
 

@@ -44,7 +44,6 @@ export default function SchedulingPage() {
   const [newScheduleTime, setNewScheduleTime] = useState<string>("10:00");
   const [newScheduleGenre, setNewScheduleGenre] = useState<StoryGenre | undefined>(undefined);
   
-  // Flag to track if initial auto-processing has been attempted for the current session/load
   const [autoProcessingAttempted, setAutoProcessingAttempted] = useState(false);
 
 
@@ -66,7 +65,7 @@ export default function SchedulingPage() {
       });
 
       if (dueItems.length > 0 && (isManualRefresh || !autoProcessingAttempted)) {
-        if (!autoProcessingAttempted) { // Set flag only once per page load unless manually refreshed
+        if (!autoProcessingAttempted) { 
           setAutoProcessingAttempted(true);
         }
         
@@ -102,7 +101,7 @@ export default function SchedulingPage() {
         });
         await Promise.all(processingPromises);
         
-        items = await getScheduledGenerations(); // Refetch to get updated statuses
+        items = await getScheduledGenerations(); 
       }
       
       setScheduledGenerations(items);
@@ -115,10 +114,8 @@ export default function SchedulingPage() {
   };
   
   useEffect(() => {
-    // Initial fetch on component mount. Pass false for isManualRefresh.
-    // Auto-processing will be triggered if conditions are met.
     fetchScheduledItems(false); 
-  }, []); // Empty dependency array ensures this runs once on mount
+  }, []); 
 
   const handleAddScheduledGeneration = () => {
     if (!newScheduleDate || !newScheduleTime || !newScheduleGenre) {
@@ -128,9 +125,9 @@ export default function SchedulingPage() {
     const dateString = format(newScheduleDate, 'yyyy-MM-dd');
     startTransition(async () => {
       const result = await scheduleStoryGenerationAction(dateString, newScheduleTime, newScheduleGenre);
-      if (result.success && result.scheduledGeneration) {
+      if (result.success && result.scheduledGeneration && result.allScheduledGenerations) {
         toast({ title: 'Hikaye Üretimi Planlandı', description: `${result.scheduledGeneration.genre} türünde hikaye ${formatDateDisplay(result.scheduledGeneration.scheduledDate, result.scheduledGeneration.scheduledTime)} için planlandı.` });
-        fetchScheduledItems(false); // Refresh list, don't treat as manual refresh for auto-processing
+        setScheduledGenerations(result.allScheduledGenerations); // Use the list returned by the action
         setNewScheduleDate(new Date());
         setNewScheduleTime("10:00");
         setNewScheduleGenre(undefined);
@@ -148,7 +145,7 @@ export default function SchedulingPage() {
       } else {
         toast({ variant: 'destructive', title: 'Üretim Başarısız', description: result.error });
       }
-      fetchScheduledItems(false); // Refresh list
+      fetchScheduledItems(false); 
     });
   };
 
@@ -157,7 +154,7 @@ export default function SchedulingPage() {
       const result = await deleteScheduledGenerationAction(id);
       if (result.success) {
         toast({ title: 'Plan Silindi', description: `${genre} türündeki ${formatDateDisplay(date, time)} tarihli plan silindi.` });
-        fetchScheduledItems(false); // Refresh list
+        fetchScheduledItems(false); 
       } else {
         toast({ variant: 'destructive', title: 'Silme Başarısız', description: result.error });
       }
@@ -171,7 +168,16 @@ export default function SchedulingPage() {
       if (!isValid(date)) return 'Geçersiz Tarih';
       let formatted = format(date, 'dd MMMM yyyy', { locale: tr });
       if (timeString) {
-        formatted += `, ${timeString}`;
+        // Ensure timeString is in HH:mm format before appending
+        const timeParts = timeString.split(':');
+        if (timeParts.length === 2 && timeParts[0].length === 2 && timeParts[1].length === 2) {
+            formatted += `, ${timeString}`;
+        } else {
+            // Fallback or log error if timeString is not as expected
+            console.warn("Unexpected timeString format for formatDateDisplay:", timeString);
+            // Potentially try to parse and reformat timeString if needed, or just append as is if confident
+            formatted += `, ${timeString}`; 
+        }
       }
       return formatted;
     } catch (e) {
@@ -179,6 +185,19 @@ export default function SchedulingPage() {
       return 'Hatalı Tarih';
     }
   };
+  
+  const formatCreatedAtDisplay = (isoDateString?: string) => {
+    if (!isoDateString) return 'N/A';
+    try {
+      const date = parseISO(isoDateString);
+      if(!isValid(date)) return 'Geçersiz Oluşturulma Tarihi';
+      return format(date, 'dd MMMM yyyy, HH:mm', { locale: tr });
+    } catch (e) {
+      console.error("Oluşturulma tarihi formatlama hatası:", e, isoDateString);
+      return 'Hatalı Oluşturulma Tarihi';
+    }
+  };
+
 
   const getStatusBadge = (status: ScheduledGeneration['status']) => {
     switch (status) {
@@ -193,7 +212,7 @@ export default function SchedulingPage() {
     }
   };
   
-  if (isLoading && scheduledGenerations.length === 0 && !autoProcessingAttempted) { // Show initial loading only before first processing attempt
+  if (isLoading && scheduledGenerations.length === 0 && !autoProcessingAttempted) { 
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -317,7 +336,7 @@ export default function SchedulingPage() {
                 <CardDescription>
                   Planlanan Zaman: {formatDateDisplay(item.scheduledDate, item.scheduledTime)}
                   <br/>
-                  Oluşturulma Tarihi: {formatDateDisplay(item.createdAt.split('T')[0], item.createdAt.split('T')[1].substring(0,5))}
+                  Oluşturulma Tarihi: {formatCreatedAtDisplay(item.createdAt)}
                 </CardDescription>
               </CardHeader>
               {item.status === 'failed' && item.errorMessage && (
@@ -339,7 +358,7 @@ export default function SchedulingPage() {
                     Şimdi Üret
                   </Button>
                 )}
-                 {item.status === 'failed' && ( // Allow retry for failed items
+                 {item.status === 'failed' && ( 
                   <Button onClick={() => handleProcessGeneration(item.id)} disabled={isTransitioning} variant="outline">
                     {isTransitioning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
                     Tekrar Dene
@@ -379,6 +398,3 @@ export default function SchedulingPage() {
     </div>
   );
 }
-
-
-    

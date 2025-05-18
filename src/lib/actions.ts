@@ -12,6 +12,7 @@ import {
   deleteScheduledGenerationById as dbDeleteScheduledGenerationById,
   updateScheduledGenerationStatus as dbUpdateScheduledGenerationStatus,
   getScheduledGenerationById as dbGetScheduledGenerationById,
+  getScheduledGenerations as dbGetScheduledGenerations, // Import getScheduledGenerations
   getWeeklySchedules as dbGetWeeklySchedules,
   upsertWeeklySchedule as dbUpsertWeeklySchedule,
   deleteWeeklyScheduleByDayTime as dbDeleteWeeklyScheduleByDayTime
@@ -137,14 +138,24 @@ export async function scheduleStoryPublicationAction(storyId: string, date: stri
 }
 
 // Actions for Date-Based Scheduled Story Generation
-export async function scheduleStoryGenerationAction(scheduledDate: string, scheduledTime: string, genre: StoryGenre): Promise<{ success: boolean; scheduledGeneration?: ScheduledGeneration; error?: string }> {
+export async function scheduleStoryGenerationAction(
+  scheduledDate: string, 
+  scheduledTime: string, 
+  genre: StoryGenre
+): Promise<{ 
+  success: boolean; 
+  scheduledGeneration?: ScheduledGeneration; 
+  allScheduledGenerations?: ScheduledGeneration[]; // Added to return all items
+  error?: string 
+}> {
   try {
     if (!scheduledDate || !scheduledTime || !genre) {
       return { success: false, error: "Lütfen tarih, saat ve tür bilgilerini eksiksiz girin." };
     }
     const newScheduledItem = await dbAddScheduledGeneration({ scheduledDate, scheduledTime, genre });
+    const allItems = await dbGetScheduledGenerations(); // Fetch all items after adding
     revalidatePath('/admin/scheduling');
-    return { success: true, scheduledGeneration: newScheduledItem };
+    return { success: true, scheduledGeneration: newScheduledItem, allScheduledGenerations: allItems };
   } catch (e) {
     const error = e instanceof Error ? e.message : "Planlama sırasında bir hata oluştu.";
     return { success: false, error };

@@ -48,7 +48,7 @@ export default function SchedulingPage() {
 
 
   const fetchScheduledItems = async (isManualRefresh = false) => {
-    if(!isManualRefresh) setIsLoading(true); else startTransition(() => {}); 
+    if(!isManualRefresh && !autoProcessingAttemptedOnLoad) setIsLoading(true); else startTransition(() => {}); 
     setError(null);
     try {
       let items = await getScheduledGenerations();
@@ -115,7 +115,8 @@ export default function SchedulingPage() {
       setError(e instanceof Error ? e.message : 'Planlanmış üretimler yüklenemedi.');
       console.error(e);
     } finally {
-      if(!isManualRefresh) setIsLoading(false);
+      if(!isManualRefresh && !autoProcessingAttemptedOnLoad && isLoading) setIsLoading(false);
+      if (isManualRefresh && isTransitioning) { /* Ensure transition ends if it was a manual refresh */ }
     }
   };
   
@@ -132,9 +133,10 @@ export default function SchedulingPage() {
     const dateString = format(newScheduleDate, 'yyyy-MM-dd');
     startTransition(async () => {
       const result = await scheduleStoryGenerationAction(dateString, newScheduleTime, newScheduleGenre);
-      if (result.success && result.scheduledGeneration && result.allScheduledGenerations) {
+      if (result.success && result.scheduledGeneration) {
         toast({ title: 'Hikaye Üretimi Planlandı', description: `${result.scheduledGeneration.genre} türünde hikaye ${formatDateDisplay(result.scheduledGeneration.scheduledDate, result.scheduledGeneration.scheduledTime)} için planlandı.` });
-        setScheduledGenerations(result.allScheduledGenerations); 
+        // Instead of relying on result.allScheduledGenerations, directly re-fetch.
+        fetchScheduledItems(true); 
         setNewScheduleDate(new Date());
         setNewScheduleTime("10:00");
         setNewScheduleGenre(undefined);
@@ -351,7 +353,7 @@ export default function SchedulingPage() {
         </Button>
       </div>
 
-      {scheduledGenerations.length === 0 && !isLoading ? (
+      {scheduledGenerations.length === 0 && !isLoading && !(isLoading && autoProcessingAttemptedOnLoad) ? (
         <div className="text-center py-10 text-muted-foreground bg-card p-6 rounded-lg shadow">
           <Info className="mx-auto h-12 w-12 mb-4" />
           <p className="text-lg">Henüz planlanmış bir hikaye üretimi yok.</p>
@@ -431,3 +433,4 @@ export default function SchedulingPage() {
     </div>
   );
 }
+

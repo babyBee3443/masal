@@ -48,7 +48,13 @@ export default function SchedulingPage() {
 
 
   const fetchScheduledItems = async (isManualRefresh = false) => {
-    if(!isManualRefresh && !autoProcessingAttemptedOnLoad) setIsLoading(true); else startTransition(() => {}); 
+    if(!isManualRefresh && !autoProcessingAttemptedOnLoad) {
+      setIsLoading(true); 
+    } else if (isManualRefresh && !isTransitioning) { 
+      // Only start transition for manual refresh if not already in one (e.g. from add/delete)
+      // This prevents nested transitions.
+      // startTransition(() => {}); // Re-evaluating if this is needed here for button refresh
+    }
     setError(null);
     try {
       let items = await getScheduledGenerations();
@@ -67,10 +73,12 @@ export default function SchedulingPage() {
 
       if (dueItems.length > 0 && (isManualRefresh || !autoProcessingAttemptedOnLoad)) {
         const toastTitle = isManualRefresh ? "Manuel Üretim Kontrolü" : "Otomatik Üretim Kontrolü";
-        toast({
-            title: toastTitle,
-            description: `${dueItems.length} adet zamanı gelmiş planlı üretim işleniyor... Bu işlem biraz sürebilir.`,
-        });
+        if(isManualRefresh || !autoProcessingAttemptedOnLoad){ // Show toast only if processing is expected
+            toast({
+                title: toastTitle,
+                description: `${dueItems.length} adet zamanı gelmiş planlı üretim işleniyor... Bu işlem biraz sürebilir.`,
+            });
+        }
 
         const processingPromises = dueItems.map(async (item) => {
           try {
@@ -116,7 +124,6 @@ export default function SchedulingPage() {
       console.error(e);
     } finally {
       if(!isManualRefresh && !autoProcessingAttemptedOnLoad && isLoading) setIsLoading(false);
-      if (isManualRefresh && isTransitioning) { /* Ensure transition ends if it was a manual refresh */ }
     }
   };
   
@@ -133,14 +140,26 @@ export default function SchedulingPage() {
     const dateString = format(newScheduleDate, 'yyyy-MM-dd');
     startTransition(async () => {
       const result = await scheduleStoryGenerationAction(dateString, newScheduleTime, newScheduleGenre);
-      if (result.success && result.scheduledGeneration) {
-        toast({ title: 'Hikaye Üretimi Planlandı', description: `${result.scheduledGeneration.genre} türünde hikaye ${formatDateDisplay(result.scheduledGeneration.scheduledDate, result.scheduledGeneration.scheduledTime)} için planlandı.` });
-        // Instead of relying on result.allScheduledGenerations, directly re-fetch.
-        fetchScheduledItems(true); 
+      if (result.success && result.allScheduledGenerations && result.scheduledGeneration) {
+        toast({ 
+          title: 'Hikaye Üretimi Planlandı', 
+          description: `${result.scheduledGeneration.genre} türünde hikaye ${formatDateDisplay(result.scheduledGeneration.scheduledDate, result.scheduledGeneration.scheduledTime)} için planlandı.` 
+        });
+        setScheduledGenerations(result.allScheduledGenerations); 
         setNewScheduleDate(new Date());
         setNewScheduleTime("10:00");
         setNewScheduleGenre(undefined);
-      } else {
+      } else if (result.success && result.scheduledGeneration) { // Fallback if allScheduledGenerations is missing
+        toast({ 
+          title: 'Hikaye Üretimi Planlandı (Liste yenileniyor)', 
+          description: `${result.scheduledGeneration.genre} türünde hikaye ${formatDateDisplay(result.scheduledGeneration.scheduledDate, result.scheduledGeneration.scheduledTime)} için planlandı. Liste birazdan güncellenecektir.` 
+        });
+        fetchScheduledItems(true); // Refetch as a fallback
+        setNewScheduleDate(new Date());
+        setNewScheduleTime("10:00");
+        setNewScheduleGenre(undefined);
+      }
+      else {
         toast({ variant: 'destructive', title: 'Planlama Başarısız', description: result.error });
       }
     });
@@ -179,32 +198,32 @@ export default function SchedulingPage() {
   const formatDateDisplay = (dateString?: string, timeString?: string) => {
     if (!dateString) return 'N/A';
     try {
-      const date = parseISO(dateString); // Assumes dateString is 'yyyy-MM-dd'
-      if (!isValid(date)) return 'Geçersiz Tarih';
+      const datePart = parseISO(dateString); // Expects YYYY-MM-DD
+      if (!isValid(datePart)) return 'Geçersiz Tarih';
       
-      let hours = '00';
-      let minutes = '00';
+      let hours = 0;
+      let minutes = 0;
 
-      if (timeString) {
+      if (timeString) { // Expects HH:MM
         const timeParts = timeString.split(':');
         if (timeParts.length === 2) {
           const parsedHours = parseInt(timeParts[0], 10);
           const parsedMinutes = parseInt(timeParts[1], 10);
           if (!isNaN(parsedHours) && parsedHours >= 0 && parsedHours <= 23) {
-            hours = String(parsedHours).padStart(2, '0');
+            hours = parsedHours;
           }
           if (!isNaN(parsedMinutes) && parsedMinutes >= 0 && parsedMinutes <= 59) {
-            minutes = String(parsedMinutes).padStart(2, '0');
+            minutes = parsedMinutes;
           }
         }
       }
       // Combine date with parsed time for formatting
-      const dateTimeToFormat = new Date(date.getFullYear(), date.getMonth(), date.getDate(), parseInt(hours,10), parseInt(minutes,10));
+      const dateTimeToFormat = new Date(datePart.getFullYear(), datePart.getMonth(), datePart.getDate(), hours, minutes);
       return format(dateTimeToFormat, 'dd MMMM yyyy, HH:mm', { locale: tr });
 
     } catch (e) {
       console.error("Error formatting date display:", dateString, timeString, e);
-      return 'Hatalı Tarih';
+      return `${dateString} ${timeString || ''} (Hatalı Format)`.trim();
     }
   };
   
@@ -233,7 +252,7 @@ export default function SchedulingPage() {
     }
   };
   
-  if (isLoading && !autoProcessingAttemptedOnLoad) { 
+  if (isLoading && !autoProcessingAttemptedOnLoad && scheduledGenerations.length === 0) { 
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -348,12 +367,17 @@ export default function SchedulingPage() {
         <h2 className="text-2xl md:text-3xl font-semibold text-foreground tracking-tight">
           Planlanmış Üretimler ({scheduledGenerations.length})
         </h2>
-        <Button onClick={() => fetchScheduledItems(true)} variant="ghost" size="icon" className="ml-2" disabled={isTransitioning || (isLoading && autoProcessingAttemptedOnLoad && !isTransitioning) }>
-            <RefreshCw className={`h-5 w-5 ${(isTransitioning || (isLoading && autoProcessingAttemptedOnLoad && !isTransitioning)) ? 'animate-spin' : ''}`} />
+        <Button onClick={() => fetchScheduledItems(true)} variant="ghost" size="icon" className="ml-2" disabled={isTransitioning || (isLoading && autoProcessingAttemptedOnLoad) }>
+            <RefreshCw className={`h-5 w-5 ${(isTransitioning || (isLoading && autoProcessingAttemptedOnLoad)) ? 'animate-spin' : ''}`} />
         </Button>
       </div>
 
-      {scheduledGenerations.length === 0 && !isLoading && !(isLoading && autoProcessingAttemptedOnLoad) ? (
+      {(isLoading && scheduledGenerations.length === 0 && !autoProcessingAttemptedOnLoad) ? (
+         <div className="flex justify-center items-center min-h-[200px]">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="ml-3 text-muted-foreground">Planlar yükleniyor...</p>
+        </div>
+      ) : scheduledGenerations.length === 0 ? (
         <div className="text-center py-10 text-muted-foreground bg-card p-6 rounded-lg shadow">
           <Info className="mx-auto h-12 w-12 mb-4" />
           <p className="text-lg">Henüz planlanmış bir hikaye üretimi yok.</p>
@@ -389,13 +413,13 @@ export default function SchedulingPage() {
               <CardFooter className="flex flex-wrap justify-end gap-2">
                 {item.status === 'pending' && (
                   <Button onClick={() => handleProcessGeneration(item.id)} disabled={isTransitioning} variant="default">
-                    {isTransitioning && scheduledGenerations.find(s => s.id === item.id && s.status !== 'pending') ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+                    {isTransitioning && scheduledGenerations.find(s => s.id === item.id)?.status !== 'pending' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
                     Şimdi Üret
                   </Button>
                 )}
                  {item.status === 'failed' && ( 
                   <Button onClick={() => handleProcessGeneration(item.id)} disabled={isTransitioning} variant="outline">
-                    {isTransitioning && scheduledGenerations.find(s => s.id === item.id && s.status !== 'failed') ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                    {isTransitioning && scheduledGenerations.find(s => s.id === item.id)?.status !== 'failed' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
                     Tekrar Dene
                   </Button>
                 )}
@@ -433,4 +457,4 @@ export default function SchedulingPage() {
     </div>
   );
 }
-
+    

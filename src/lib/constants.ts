@@ -1,5 +1,5 @@
 import type { StoryGenre } from './types';
 
-export const GENRES: StoryGenre[] = ["Horror", "Adventure", "Romance", "Sci-Fi", "Fable", "Philosophical"];
+export const GENRES: StoryGenre[] = ["Korku", "Macera", "Romantik", "Bilim Kurgu", "Fabıl", "Felsefi"];
 
-export const APP_NAME = "ChronoTales";
+export const APP_NAME = "Masal Dünyası";

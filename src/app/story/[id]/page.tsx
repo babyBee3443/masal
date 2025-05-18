@@ -10,6 +10,8 @@ import { StoryCard } from '@/components/site/StoryCard';
 import { Header } from '@/components/site/Header';
 import { Footer } from '@/components/site/Footer';
 import { Separator } from '@/components/ui/separator';
+import { APP_NAME } from '@/lib/constants';
+
 
 interface StoryPageProps {
   params: { id: string };
@@ -25,10 +27,10 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: StoryPageProps) {
   const story = await getStoryById(params.id);
   if (!story || story.status !== 'published') {
-    return { title: 'Story Not Found' };
+    return { title: `Hikaye Bulunamadı | ${APP_NAME}` };
   }
   return {
-    title: story.title,
+    title: `${story.title} | ${APP_NAME}`,
     description: story.summary,
   };
 }
@@ -52,7 +54,7 @@ async function RelatedStories({ currentStoryId, currentGenre }: { currentStoryId
 
   return (
     <section className="mt-12 md:mt-16 animate-fadeIn" style={{animationDelay: '0.6s'}}>
-      <h2 className="text-2xl md:text-3xl font-semibold mb-6 text-center md:text-left">Similar Tales</h2>
+      <h2 className="text-2xl md:text-3xl font-semibold mb-6 text-center md:text-left">Benzer Masallar</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {stories.map(story => (
           <StoryCard key={story.id} story={story} />
@@ -71,6 +73,7 @@ export default async function StoryPage({ params }: StoryPageProps) {
   }
 
   const paragraphs = story.content.split('\n').filter(p => p.trim() !== '');
+  const capitalizedGenre = story.genre.charAt(0).toUpperCase() + story.genre.slice(1).toLowerCase();
 
   return (
     <>
@@ -80,17 +83,17 @@ export default async function StoryPage({ params }: StoryPageProps) {
           <div className="mb-6 animate-fadeIn">
             <Button variant="outline" asChild>
               <Link href={searchParamsReferrer() || "/"}>
-                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Stories
+                <ArrowLeft className="mr-2 h-4 w-4" /> Hikayelere Geri Dön
               </Link>
             </Button>
           </div>
 
           <header className="mb-8 animate-fadeIn" style={{animationDelay: '0.1s'}}>
-            <Badge variant="secondary" className="mb-3 bg-accent/20 text-accent-foreground">{story.genre}</Badge>
+            <Badge variant="secondary" className="mb-3 bg-accent/20 text-accent-foreground">{capitalizedGenre}</Badge>
             <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4 leading-tight">{story.title}</h1>
             {story.publishedAt && (
               <p className="text-sm text-muted-foreground">
-                Published on {new Date(story.publishedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                Yayınlanma tarihi: {new Date(story.publishedAt).toLocaleDateString('tr-TR', { year: 'numeric', month: 'long', day: 'numeric' })}
               </p>
             )}
           </header>
@@ -98,7 +101,7 @@ export default async function StoryPage({ params }: StoryPageProps) {
           <div className="mb-8 animate-fadeIn" style={{animationDelay: '0.2s'}}>
             <Image
               src={story.imageUrl || `https://placehold.co/800x500.png`}
-              alt={`Illustration for ${story.title}`}
+              alt={`${story.title} için illüstrasyon`}
               width={800}
               height={500}
               className="w-full h-auto rounded-xl object-cover shadow-xl"

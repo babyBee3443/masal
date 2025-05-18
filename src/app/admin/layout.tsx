@@ -5,7 +5,7 @@ import { Logo } from '@/components/site/Logo';
 import { Button } from '@/components/ui/button';
 
 export const metadata = {
-  title: `Admin Panel | ${APP_NAME}`,
+  title: `Admin Paneli | ${APP_NAME}`,
   robots: 'noindex, nofollow', // Prevent indexing of admin panel
 };
 
@@ -20,10 +20,10 @@ export default function AdminLayout({
         <div className="container mx-auto px-4 md:px-6 h-20 flex items-center justify-between">
           <Link href="/admin" className="flex items-center gap-2">
             <Logo className="h-8 w-auto" />
-            <span className="text-xl font-semibold text-foreground">Admin Panel</span>
+            <span className="text-xl font-semibold text-foreground">Admin Paneli</span>
           </Link>
           <Button variant="outline" asChild>
-            <Link href="/">View Site</Link>
+            <Link href="/">Siteyi Görüntüle</Link>
           </Button>
         </div>
       </header>

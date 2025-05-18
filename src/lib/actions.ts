@@ -9,39 +9,39 @@ import { regenerateAIImage as aiRegenerateAIImage } from '@/ai/flows/generate-im
 export async function publishStoryAction(storyId: string) {
   try {
     const updatedStory = await dbUpdateStory(storyId, { status: 'published', publishedAt: new Date().toISOString() });
-    if (!updatedStory) throw new Error('Story not found');
+    if (!updatedStory) throw new Error('Hikaye bulunamadı');
     revalidatePath('/');
     revalidatePath('/admin');
     revalidatePath(`/story/${storyId}`);
     revalidatePath(`/categories/${updatedStory.genre}`);
     return { success: true, story: updatedStory };
   } catch (error) {
-    console.error("Failed to publish story:", error);
-    return { success: false, error: error instanceof Error ? error.message : 'Failed to publish story' };
+    console.error("Hikaye yayınlanamadı:", error);
+    return { success: false, error: error instanceof Error ? error.message : 'Hikaye yayınlanamadı' };
   }
 }
 
 export async function deleteStoryAction(storyId: string) {
   try {
     const deleted = await dbDeleteStoryById(storyId);
-    if (!deleted) throw new Error('Story not found or already deleted');
+    if (!deleted) throw new Error('Hikaye bulunamadı veya zaten silinmiş');
     revalidatePath('/');
     revalidatePath('/admin');
     // Potentially revalidate category pages if you list counts or specific stories
     return { success: true };
   } catch (error) {
-    console.error("Failed to delete story:", error);
-    return { success: false, error: error instanceof Error ? error.message : 'Failed to delete story' };
+    console.error("Hikaye silinemedi:", error);
+    return { success: false, error: error instanceof Error ? error.message : 'Hikaye silinemedi' };
   }
 }
 
 export async function updateStoryCategoryAction(storyId: string, newGenre: StoryGenre) {
   try {
     const oldStory = await dbGetStoryById(storyId);
-    if (!oldStory) throw new Error('Story not found');
+    if (!oldStory) throw new Error('Hikaye bulunamadı');
 
     const updatedStory = await dbUpdateStory(storyId, { genre: newGenre });
-    if (!updatedStory) throw new Error('Failed to update story category');
+    if (!updatedStory) throw new Error('Hikaye kategorisi güncellenemedi');
     
     revalidatePath('/admin');
     revalidatePath(`/story/${storyId}`);
@@ -52,8 +52,8 @@ export async function updateStoryCategoryAction(storyId: string, newGenre: Story
     }
     return { success: true, story: updatedStory };
   } catch (error) {
-    console.error("Failed to update story category:", error);
-    return { success: false, error: error instanceof Error ? error.message : 'Failed to update category' };
+    console.error("Hikaye kategorisi güncellenemedi:", error);
+    return { success: false, error: error instanceof Error ? error.message : 'Kategori güncellenemedi' };
   }
 }
 
@@ -71,8 +71,8 @@ export async function generateNewStoryAction(genre: StoryGenre): Promise<{ succe
     revalidatePath('/admin');
     return { success: true, story: savedStory };
   } catch (error) {
-    console.error("Failed to generate new story:", error);
-    return { success: false, error: error instanceof Error ? error.message : 'Failed to generate story via AI' };
+    console.error("Yeni hikaye oluşturulamadı:", error);
+    return { success: false, error: error instanceof Error ? error.message : 'Yapay zeka ile hikaye oluşturulamadı' };
   }
 }
 
@@ -80,10 +80,10 @@ export async function regenerateStoryImageAction(storyId: string, storyText: str
   try {
     const aiResult = await aiRegenerateAIImage({ storyText });
     if (!aiResult.imageUrl) {
-      throw new Error('AI failed to generate a new image URL.');
+      throw new Error('Yapay zeka yeni bir görsel URLsi oluşturamadı.');
     }
     const updatedStory = await dbUpdateStory(storyId, { imageUrl: aiResult.imageUrl });
-    if (!updatedStory) throw new Error('Story not found for image update');
+    if (!updatedStory) throw new Error('Görsel güncellemesi için hikaye bulunamadı');
     
     revalidatePath('/admin');
     revalidatePath(`/story/${storyId}`);
@@ -93,7 +93,7 @@ export async function regenerateStoryImageAction(storyId: string, storyText: str
     }
     return { success: true, imageUrl: aiResult.imageUrl };
   } catch (error) {
-    console.error("Failed to regenerate image:", error);
-    return { success: false, error: error instanceof Error ? error.message : 'Failed to regenerate image' };
+    console.error("Görsel yeniden oluşturulamadı:", error);
+    return { success: false, error: error instanceof Error ? error.message : 'Görsel yeniden oluşturulamadı' };
   }
 }

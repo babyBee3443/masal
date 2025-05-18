@@ -8,11 +8,11 @@ import { cn } from '@/lib/utils';
 import type { StoryGenre } from '@/lib/types';
 
 interface CategoryTabsProps {
-  currentGenre?: StoryGenre | 'All';
+  currentGenre?: StoryGenre | 'Tümü'; // Changed 'All' to 'Tümü'
   basePath?: string; // e.g. "/" for homepage, "/categories" for categories page
 }
 
-export function CategoryTabs({ currentGenre = 'All', basePath = "/" }: CategoryTabsProps) {
+export function CategoryTabs({ currentGenre = 'Tümü', basePath = "/" }: CategoryTabsProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -24,16 +24,38 @@ export function CategoryTabs({ currentGenre = 'All', basePath = "/" }: CategoryT
       params.delete('genre');
     }
     const queryString = params.toString();
+    
+    // For basePath="/categories", if genre is undefined (meaning 'All'), link to a default category or main categories page.
+    // Assuming default category is the first in GENRES.
+    if (basePath === "/categories" && !genre) {
+        return `/categories/${GENRES[0]}${queryString ? `?${queryString}` : ''}`;
+    }
+    if (basePath === "/categories" && genre) {
+        return `${basePath}/${genre}${queryString ? `?${queryString}` : ''}`;
+    }
+    
     return `${basePath}${queryString ? `?${queryString}` : ''}`;
   }
 
-  const genresToShow: (StoryGenre | 'All')[] = ['All', ...GENRES];
+  const genresToShow: (StoryGenre | 'Tümü')[] = ['Tümü', ...GENRES];
 
   return (
     <div className="mb-8 flex flex-wrap gap-2 items-center justify-center">
       {genresToShow.map((genre) => {
-        const isActive = (currentGenre === genre) || (genre === 'All' && !currentGenre);
-        const href = basePath === "/categories" ? (genre === 'All' ? '/categories/Adventure' : `/categories/${genre}`) : createHref(genre === 'All' ? undefined : genre) ;
+        const isActive = (currentGenre === genre) || (genre === 'Tümü' && !currentGenre);
+        
+        let href = '';
+        if (basePath === "/categories") {
+          href = genre === 'Tümü' ? `/categories/${GENRES[0]}` : `/categories/${genre}`;
+          const params = new URLSearchParams(searchParams.toString());
+          params.delete('genre'); // Remove genre from query for category base path
+          const queryString = params.toString();
+          if (queryString) {
+            href += `?${queryString}`;
+          }
+        } else {
+          href = createHref(genre === 'Tümü' ? undefined : genre);
+        }
         
         return (
           <Button

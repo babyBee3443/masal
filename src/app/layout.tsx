@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     default: APP_NAME,
     template: `%s | ${APP_NAME}`,
   },
-  description: `Discover enchanting AI-generated stories on ${APP_NAME}. Your daily dose of imagination.`,
+  description: `${APP_NAME} üzerinde büyüleyici yapay zeka tarafından üretilmiş hikayeleri keşfedin. Günlük hayal gücü dozunuz.`,
 };
 
 export default function RootLayout({
@@ -22,7 +22,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="">
+    <html lang="tr" className="">
       <body className="antialiased flex flex-col min-h-screen">
         {/* Header and Footer are part of this root layout for public pages.
             Admin pages will use admin/layout.tsx to override or provide a different structure.

@@ -8,12 +8,13 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from '@/components/ui/sheet';
 import { Logo } from '@/components/site/Logo';
 import { cn } from '@/lib/utils';
-import { GENRES }
-from '@/lib/constants';
+import { GENRES, APP_NAME } from '@/lib/constants';
+
+const defaultCategory = GENRES[0] || "Adventure"; // Default category for the link
 
 const navLinks = [
-  { href: '/', label: 'Home', icon: Home },
-  { href: '/categories/Adventure', label: 'Categories', icon: LayoutGrid },
+  { href: '/', label: 'Anasayfa', icon: Home },
+  { href: `/categories/${defaultCategory}`, label: 'Kategoriler', icon: LayoutGrid },
   // Add other top-level navigation links here if needed
 ];
 
@@ -67,7 +68,7 @@ export function Header() {
       isScrolled ? "bg-background/80 backdrop-blur-md shadow-md" : "bg-transparent"
     )}>
       <div className="container mx-auto flex h-20 items-center justify-between px-4 md:px-6">
-        <Link href="/" aria-label="ChronoTales Home">
+        <Link href="/" aria-label={`${APP_NAME} Anasayfa`}>
           <Logo className="h-10 w-auto" />
         </Link>
 
@@ -76,7 +77,7 @@ export function Header() {
           {navLinks.map((link) => (
             <Button variant="ghost" asChild key={link.href} className={cn(
               "text-sm font-medium transition-colors hover:text-primary",
-               (pathname === link.href || (link.href !== '/' && pathname.startsWith(link.href))) ? "text-primary" : "text-foreground/70"
+               (pathname === link.href || (link.href !== '/' && pathname.startsWith(link.href) && !link.href.includes('/categories') ) || (link.href.includes('/categories') && pathname.startsWith('/categories')) ) ? "text-primary" : "text-foreground/70"
             )}>
               <Link href={link.href}>
                 {link.label}
@@ -88,7 +89,7 @@ export function Header() {
                pathname.startsWith('/admin') ? "text-primary" : "text-foreground/70"
             )}>
               <Link href="/admin">
-                Admin Panel
+                Admin Paneli
               </Link>
             </Button>
         </nav>
@@ -99,7 +100,7 @@ export function Header() {
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon">
                 <Menu className="h-6 w-6" />
-                <span className="sr-only">Open menu</span>
+                <span className="sr-only">Menüyü aç</span>
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-full max-w-xs bg-background p-6 shadow-xl">
@@ -110,7 +111,7 @@ export function Header() {
                 <SheetClose asChild>
                   <Button variant="ghost" size="icon">
                     <X className="h-6 w-6" />
-                    <span className="sr-only">Close menu</span>
+                    <span className="sr-only">Menüyü kapat</span>
                   </Button>
                 </SheetClose>
               </div>
@@ -125,7 +126,7 @@ export function Header() {
                     )}
                   </div>
                 ))}
-                 <NavLinkItem href="/admin" label="Admin Panel" icon={BookOpen} />
+                 <NavLinkItem href="/admin" label="Admin Paneli" icon={BookOpen} />
               </nav>
             </SheetContent>
           </Sheet>

@@ -28,7 +28,7 @@ export default function AdminPage() {
       });
       setStories(fetchedStories);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load stories.');
+      setError(e instanceof Error ? e.message : 'Hikayeler yüklenemedi.');
       console.error(e);
     } finally {
       setIsLoading(false);
@@ -52,7 +52,7 @@ export default function AdminPage() {
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-4 text-lg text-muted-foreground">Loading stories...</p>
+        <p className="ml-4 text-lg text-muted-foreground">Hikayeler yükleniyor...</p>
       </div>
     );
   }
@@ -61,10 +61,10 @@ export default function AdminPage() {
     return (
       <div className="text-center py-10 text-red-600 bg-red-50 p-6 rounded-lg shadow-md">
         <AlertTriangle className="mx-auto h-12 w-12 mb-4" />
-        <h2 className="text-2xl font-semibold mb-2">Error Loading Stories</h2>
+        <h2 className="text-2xl font-semibold mb-2">Hikayeler Yüklenirken Hata Oluştu</h2>
         <p>{error}</p>
         <button onClick={fetchStories} className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
-          Try Again
+          Tekrar Dene
         </button>
       </div>
     );
@@ -75,7 +75,7 @@ export default function AdminPage() {
       return (
         <div className="text-center py-10 text-muted-foreground bg-card p-6 rounded-lg shadow">
           <Inbox className="mx-auto h-12 w-12 mb-4" />
-          <p className="text-lg">No {listTitle.toLowerCase()} stories at the moment.</p>
+          <p className="text-lg">Şu anda hiç {listTitle.toLowerCase()} hikaye yok.</p>
         </div>
       );
     }
@@ -91,26 +91,26 @@ export default function AdminPage() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-3xl md:text-4xl font-bold text-foreground tracking-tight">Story Management</h1>
+      <h1 className="text-3xl md:text-4xl font-bold text-foreground tracking-tight">Hikaye Yönetimi</h1>
       
       <GenerateStorySection onStoryGenerated={handleStoryGeneratedOrUpdated} />
 
       <Separator className="my-8" />
       
       <h2 className="text-2xl md:text-3xl font-semibold text-foreground tracking-tight mb-4">
-        Story Queue {isRefreshing && <Loader2 className="inline-block ml-2 h-6 w-6 animate-spin" />}
+        Hikaye Kuyruğu {isRefreshing && <Loader2 className="inline-block ml-2 h-6 w-6 animate-spin" />}
       </h2>
 
       <Tabs defaultValue="pending" className="w-full">
         <TabsList className="grid w-full grid-cols-2 md:w-1/2 mb-6">
-          <TabsTrigger value="pending">Pending ({pendingStories.length})</TabsTrigger>
-          <TabsTrigger value="published">Published ({publishedStories.length})</TabsTrigger>
+          <TabsTrigger value="pending">Bekleyen ({pendingStories.length})</TabsTrigger>
+          <TabsTrigger value="published">Yayınlanmış ({publishedStories.length})</TabsTrigger>
         </TabsList>
         <TabsContent value="pending">
-          {renderStoryList(pendingStories, "Pending")}
+          {renderStoryList(pendingStories, "Bekleyen")}
         </TabsContent>
         <TabsContent value="published">
-          {renderStoryList(publishedStories, "Published")}
+          {renderStoryList(publishedStories, "Yayınlanmış")}
         </TabsContent>
       </Tabs>
     </div>

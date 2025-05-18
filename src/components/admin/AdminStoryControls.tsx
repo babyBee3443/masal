@@ -38,9 +38,9 @@ export function AdminStoryControls({ story: initialStory }: AdminStoryControlsPr
       const result = await publishStoryAction(story.id);
       if (result.success && result.story) {
         setStory(result.story);
-        toast({ title: 'Story Published', description: `"${result.story.title}" is now live.` });
+        toast({ title: 'Hikaye Yayınlandı', description: `"${result.story.title}" artık yayında.` });
       } else {
-        toast({ variant: 'destructive', title: 'Error Publishing', description: result.error });
+        toast({ variant: 'destructive', title: 'Yayınlama Hatası', description: result.error });
       }
     });
   };
@@ -49,12 +49,12 @@ export function AdminStoryControls({ story: initialStory }: AdminStoryControlsPr
     startTransition(async () => {
       const result = await deleteStoryAction(story.id);
       if (result.success) {
-        toast({ title: 'Story Deleted', description: `"${story.title}" has been deleted.` });
+        toast({ title: 'Hikaye Silindi', description: `"${story.title}" silindi.` });
         // Here, the parent component should handle removing this card from the list
         // For now, we can disable buttons or show a deleted state.
         // This component instance will likely be unmounted by parent.
       } else {
-        toast({ variant: 'destructive', title: 'Error Deleting', description: result.error });
+        toast({ variant: 'destructive', title: 'Silme Hatası', description: result.error });
       }
     });
   };
@@ -64,9 +64,9 @@ export function AdminStoryControls({ story: initialStory }: AdminStoryControlsPr
       const result = await updateStoryCategoryAction(story.id, newGenre);
       if (result.success && result.story) {
         setStory(result.story);
-        toast({ title: 'Category Updated', description: `Category for "${result.story.title}" changed to ${newGenre}.` });
+        toast({ title: 'Kategori Güncellendi', description: `"${result.story.title}" hikayesinin kategorisi ${newGenre} olarak değiştirildi.` });
       } else {
-        toast({ variant: 'destructive', title: 'Error Updating Category', description: result.error });
+        toast({ variant: 'destructive', title: 'Kategori Güncelleme Hatası', description: result.error });
       }
     });
   };
@@ -76,16 +76,16 @@ export function AdminStoryControls({ story: initialStory }: AdminStoryControlsPr
       const result = await regenerateStoryImageAction(story.id, story.content);
       if (result.success && result.imageUrl) {
         setStory(prev => ({ ...prev, imageUrl: result.imageUrl! }));
-        toast({ title: 'Image Regenerated', description: `New image generated for "${story.title}".` });
+        toast({ title: 'Görsel Yeniden Oluşturuldu', description: `"${story.title}" için yeni görsel oluşturuldu.` });
       } else {
-        toast({ variant: 'destructive', title: 'Error Regenerating Image', description: result.error });
+        toast({ variant: 'destructive', title: 'Görsel Yeniden Oluşturma Hatası', description: result.error });
       }
     });
   };
   
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    return new Date(dateString).toLocaleDateString('tr-TR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   }
 
 
@@ -94,13 +94,13 @@ export function AdminStoryControls({ story: initialStory }: AdminStoryControlsPr
       <CardHeader>
         <CardTitle className="text-2xl">{story.title}</CardTitle>
         <CardDescription>
-          Status: <span className={`font-semibold ${story.status === 'published' ? 'text-green-600' : 'text-orange-500'}`}>{story.status}</span>
+          Durum: <span className={`font-semibold ${story.status === 'published' ? 'text-green-600' : 'text-orange-500'}`}>{story.status === 'published' ? 'Yayınlandı' : 'Beklemede'}</span>
           <span className="mx-2">|</span>
-          Genre: {story.genre}
+          Tür: {story.genre}
           <br />
-          Created: {formatDate(story.createdAt)}
+          Oluşturulma: {formatDate(story.createdAt)}
           {story.status === 'published' && story.publishedAt && (
-            <> | Published: {formatDate(story.publishedAt)}</>
+            <> | Yayınlanma: {formatDate(story.publishedAt)}</>
           )}
         </CardDescription>
       </CardHeader>
@@ -108,7 +108,7 @@ export function AdminStoryControls({ story: initialStory }: AdminStoryControlsPr
         <div className="md:col-span-1">
           <Image
             src={story.imageUrl || `https://placehold.co/600x480.png`}
-            alt={`Image for ${story.title}`}
+            alt={`${story.title} için görsel`}
             width={600}
             height={480}
             className="rounded-lg object-cover w-full aspect-[4/3] shadow-md"
@@ -116,12 +116,12 @@ export function AdminStoryControls({ story: initialStory }: AdminStoryControlsPr
           />
           <Button onClick={handleRegenerateImage} disabled={isPending} className="w-full mt-4" variant="outline">
             {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-            Regenerate Image
+            Görseli Yeniden Oluştur
           </Button>
         </div>
         <div className="md:col-span-2 space-y-4">
           <div>
-            <label htmlFor={`content-${story.id}`} className="text-sm font-medium text-muted-foreground block mb-1">Content Preview (Summary)</label>
+            <label htmlFor={`summary-${story.id}`} className="text-sm font-medium text-muted-foreground block mb-1">İçerik Önizleme (Özet)</label>
              <Textarea
                 id={`summary-${story.id}`}
                 value={story.summary}
@@ -130,7 +130,7 @@ export function AdminStoryControls({ story: initialStory }: AdminStoryControlsPr
               />
           </div>
            <div>
-            <label htmlFor={`content-${story.id}`} className="text-sm font-medium text-muted-foreground block mb-1">Full Content</label>
+            <label htmlFor={`content-${story.id}`} className="text-sm font-medium text-muted-foreground block mb-1">Tam İçerik</label>
              <Textarea
                 id={`content-${story.id}`}
                 value={story.content}
@@ -139,10 +139,10 @@ export function AdminStoryControls({ story: initialStory }: AdminStoryControlsPr
               />
           </div>
           <div>
-            <label htmlFor={`category-${story.id}`} className="text-sm font-medium text-muted-foreground block mb-1">Change Category</label>
+            <label htmlFor={`category-${story.id}`} className="text-sm font-medium text-muted-foreground block mb-1">Kategoriyi Değiştir</label>
             <Select value={story.genre} onValueChange={(value) => handleCategoryChange(value as StoryGenre)} disabled={isPending}>
               <SelectTrigger id={`category-${story.id}`} className="w-full">
-                <SelectValue placeholder="Select genre" />
+                <SelectValue placeholder="Tür seçin" />
               </SelectTrigger>
               <SelectContent>
                 {GENRES.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
@@ -155,27 +155,27 @@ export function AdminStoryControls({ story: initialStory }: AdminStoryControlsPr
         {story.status === 'pending' && (
           <Button onClick={handlePublish} disabled={isPending} className="bg-green-600 hover:bg-green-700 text-white">
             {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
-            Publish
+            Yayınla
           </Button>
         )}
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button variant="destructive" disabled={isPending}>
               {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-              Delete
+              Sil
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure you want to delete this story?</AlertDialogTitle>
+              <AlertDialogTitle>Bu hikayeyi silmek istediğinize emin misiniz?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the story titled "{story.title}".
+                Bu işlem geri alınamaz. Bu, "{story.title}" başlıklı hikayeyi kalıcı olarak silecek.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogCancel>İptal</AlertDialogCancel>
               <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
-                Yes, delete story
+                Evet, hikayeyi sil
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

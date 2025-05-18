@@ -26,11 +26,13 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: CategoryPageProps) {
   const genre = params.genre;
   if (!GENRES.includes(genre)) {
-    return { title: 'Category Not Found' };
+    return { title: 'Kategori Bulunamadı' };
   }
+  // Capitalize genre for title
+  const capitalizedGenre = genre.charAt(0).toUpperCase() + genre.slice(1).toLowerCase();
   return {
-    title: `${genre} Stories`,
-    description: `Discover captivating ${genre.toLowerCase()} stories on ChronoTales.`,
+    title: `${capitalizedGenre} Hikayeleri`,
+    description: `${APP_NAME} üzerinde büyüleyici ${genre.toLowerCase()} hikayelerini keşfedin.`,
   };
 }
 
@@ -48,15 +50,18 @@ async function StoriesForCategory({ genre, query }: { genre: StoryGenre; query?:
     );
   }
 
+  // Capitalize genre for display
+  const capitalizedGenreDisplay = genre.charAt(0).toUpperCase() + genre.slice(1).toLowerCase();
+
   if (stories.length === 0) {
     return (
       <div className="text-center py-12 animate-fadeIn">
         <Sparkles className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-        <h2 className="text-2xl font-semibold text-foreground mb-2">No {genre} Stories Found</h2>
+        <h2 className="text-2xl font-semibold text-foreground mb-2">Hiç {capitalizedGenreDisplay} Hikayesi Bulunamadı</h2>
         <p className="text-muted-foreground mb-6">
-          It seems there are no stories in this category matching your criteria right now.
-          {query && " Try a different search term, or "}
-          <Link href={`/categories/${genre}`} className="text-primary hover:underline">clear search</Link>.
+          Görünüşe göre bu kategoride şu anda kriterlerinize uyan hiçbir hikaye yok.
+          {query && " Farklı bir arama terimi deneyin, veya "}
+          <Link href={`/categories/${genre}`} className="text-primary hover:underline">aramayı temizle</Link>.
         </p>
       </div>
     );
@@ -79,6 +84,8 @@ export default function CategoryPage({ params, searchParams }: CategoryPageProps
   if (!GENRES.includes(genre)) {
     notFound();
   }
+  // Capitalize genre for display
+  const capitalizedGenreDisplay = genre.charAt(0).toUpperCase() + genre.slice(1).toLowerCase();
 
   return (
     <>
@@ -87,11 +94,11 @@ export default function CategoryPage({ params, searchParams }: CategoryPageProps
         <section className="text-center py-12 md:py-16 animate-fadeIn">
           <h1 className="text-4xl md:text-5xl font-bold mb-4 tracking-tight">
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary via-accent to-primary">
-              {genre}
-            </span> Stories
+              {capitalizedGenreDisplay}
+            </span> Hikayeleri
           </h1>
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-            Dive into the world of {genre.toLowerCase()} tales. Let your imagination soar.
+            {genre.toLowerCase()} masallarının dünyasına dalın. Hayal gücünüzü uçurun.
           </p>
         </section>
 
@@ -100,14 +107,14 @@ export default function CategoryPage({ params, searchParams }: CategoryPageProps
             <Input
               type="search"
               name="q"
-              placeholder={`Search in ${genre} stories...`}
+              placeholder={`${capitalizedGenreDisplay} hikayelerinde ara...`}
               className="flex-grow text-base"
               defaultValue={searchQuery}
-              aria-label={`Search in ${genre} stories`}
+              aria-label={`${capitalizedGenreDisplay} hikayelerinde ara`}
             />
             <Button type="submit" variant="default" size="lg">
               <Search className="h-5 w-5 mr-0 md:mr-2" />
-              <span className="hidden md:inline">Search</span>
+              <span className="hidden md:inline">Ara</span>
             </Button>
           </form>
           <CategoryTabs currentGenre={genre} basePath="/categories" />

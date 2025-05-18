@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Search, Sparkles } from 'lucide-react';
 import { Header } from '@/components/site/Header';
 import { Footer } from '@/components/site/Footer';
+import { APP_NAME } from '@/lib/constants';
 
 interface HomePageProps {
   searchParams: {
@@ -39,13 +40,13 @@ async function StoriesList({ genre, query }: { genre?: StoryGenre; query?: strin
     return (
       <div className="text-center py-12 animate-fadeIn">
         <Sparkles className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-        <h2 className="text-2xl font-semibold text-foreground mb-2">No Stories Found</h2>
+        <h2 className="text-2xl font-semibold text-foreground mb-2">Hiç Hikaye Bulunamadı</h2>
         <p className="text-muted-foreground mb-6">
-          It seems there are no stories matching your criteria right now.
-          { (genre || query) && " Try a different filter or search term." }
+          Görünüşe göre şu anda kriterlerinize uyan hiçbir hikaye yok.
+          { (genre || query) && " Farklı bir filtre veya arama terimi deneyin." }
         </p>
         <Button asChild variant="outline">
-          <Link href="/">Clear Filters</Link>
+          <Link href="/">Filtreleri Temizle</Link>
         </Button>
       </div>
     );
@@ -70,10 +71,10 @@ export default function HomePage({ searchParams }: HomePageProps) {
       <main className="flex-grow container mx-auto px-4 md:px-6 py-8">
         <section className="text-center py-12 md:py-16 animate-fadeIn">
           <h1 className="text-4xl md:text-5xl font-bold mb-4 tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-primary via-accent to-primary">
-            Welcome to ChronoTales
+            {APP_NAME}'ne Hoş Geldiniz
           </h1>
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-            Embark on journeys through AI-generated realms of wonder, suspense, and romance. New tales await your discovery.
+            Yapay zeka tarafından üretilmiş merak, gerilim ve romantizm dolu diyarlarda yolculuklara çıkın. Yeni masallar keşfinizi bekliyor.
           </p>
         </section>
 
@@ -82,18 +83,18 @@ export default function HomePage({ searchParams }: HomePageProps) {
             <Input
               type="search"
               name="q"
-              placeholder="Search stories by keyword..."
+              placeholder="Hikayeleri anahtar kelime ile arayın..."
               className="flex-grow text-base"
               defaultValue={searchQuery}
-              aria-label="Search stories"
+              aria-label="Hikaye ara"
             />
             {currentGenre && <input type="hidden" name="genre" value={currentGenre} />}
             <Button type="submit" variant="default" size="lg">
               <Search className="h-5 w-5 mr-0 md:mr-2" />
-              <span className="hidden md:inline">Search</span>
+              <span className="hidden md:inline">Ara</span>
             </Button>
           </form>
-          <CategoryTabs currentGenre={currentGenre || 'All'} basePath="/" />
+          <CategoryTabs currentGenre={currentGenre || 'Tümü'} basePath="/" />
         </section>
 
         <Suspense fallback={<LoadingStories />}>

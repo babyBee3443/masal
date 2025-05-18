@@ -26,3 +26,15 @@ export interface ScheduledGeneration {
   generatedStoryId?: string; // ID of the story once generated
   errorMessage?: string; // If status is 'failed'
 }
+
+// Represents days of the week, 0 for Monday, 6 for Sunday for UI consistency
+export type DayOfWeek = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+export interface WeeklyScheduleItem {
+  id: string;
+  dayOfWeek: DayOfWeek; // 0 (Pazartesi) to 6 (Pazar)
+  time: string; // HH:MM format, e.g., "09:00", "14:30"
+  genre: StoryGenre;
+  createdAt: string; // ISO date string
+  updatedAt: string; // ISO date string
+}

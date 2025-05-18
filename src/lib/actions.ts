@@ -2,7 +2,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import type { Story, StoryGenre, ScheduledGeneration } from '@/lib/types';
+import type { Story, StoryGenre, ScheduledGeneration, WeeklyScheduleItem, DayOfWeek } from '@/lib/types';
 import { 
   addStory as dbAddStory, 
   deleteStoryById as dbDeleteStoryById, 
@@ -11,7 +11,10 @@ import {
   addScheduledGeneration as dbAddScheduledGeneration,
   deleteScheduledGenerationById as dbDeleteScheduledGenerationById,
   updateScheduledGenerationStatus as dbUpdateScheduledGenerationStatus,
-  getScheduledGenerationById as dbGetScheduledGenerationById
+  getScheduledGenerationById as dbGetScheduledGenerationById,
+  getWeeklySchedules as dbGetWeeklySchedules,
+  upsertWeeklySchedule as dbUpsertWeeklySchedule,
+  deleteWeeklyScheduleByDayTime as dbDeleteWeeklyScheduleByDayTime
 } from '@/lib/mock-db';
 import { generateStory as aiGenerateStory } from '@/ai/flows/generate-story';
 import { regenerateAIImage as aiRegenerateAIImage } from '@/ai/flows/generate-image';
@@ -133,7 +136,7 @@ export async function scheduleStoryPublicationAction(storyId: string, date: stri
   }
 }
 
-// Actions for Scheduled Story Generation
+// Actions for Date-Based Scheduled Story Generation
 export async function scheduleStoryGenerationAction(scheduledDate: string, scheduledTime: string, genre: StoryGenre): Promise<{ success: boolean; scheduledGeneration?: ScheduledGeneration; error?: string }> {
   try {
     if (!scheduledDate || !scheduledTime || !genre) {
@@ -163,7 +166,7 @@ export async function processScheduledGenerationAction(id: string): Promise<{ su
     if (generationResult.success && generationResult.story) {
       await dbUpdateScheduledGenerationStatus(id, 'generated', generationResult.story.id);
       revalidatePath('/admin/scheduling');
-      revalidatePath('/admin', 'layout'); // To update main admin story list
+      revalidatePath('/admin', 'layout'); 
       return { success: true, story: generationResult.story };
     } else {
       await dbUpdateScheduledGenerationStatus(id, 'failed', undefined, generationResult.error || "Hikaye üretilemedi.");
@@ -192,3 +195,38 @@ export async function deleteScheduledGenerationAction(id: string): Promise<{ suc
   }
 }
 
+// Actions for Weekly Recurring Story Generation
+export async function getWeeklySchedulesAction(): Promise<{ success: boolean; schedules?: WeeklyScheduleItem[]; error?: string; }> {
+  try {
+    const schedules = await dbGetWeeklySchedules();
+    return { success: true, schedules };
+  } catch (e) {
+    const error = e instanceof Error ? e.message : "Haftalık planlar getirilirken bir hata oluştu.";
+    console.error("Haftalık planlar getirme hatası:", error);
+    return { success: false, error };
+  }
+}
+
+export async function saveWeeklyScheduleSlotAction(dayOfWeek: DayOfWeek, time: string, genre: StoryGenre | null): Promise<{ success: boolean; scheduleItem?: WeeklyScheduleItem; error?: string; }> {
+  try {
+    if (genre) {
+      // Upsert (add or update) the schedule item
+      const scheduleItem = await dbUpsertWeeklySchedule({ dayOfWeek, time, genre });
+      revalidatePath('/admin/weekly-schedule');
+      return { success: true, scheduleItem };
+    } else {
+      // Delete the schedule item for this slot
+      const deleted = await dbDeleteWeeklyScheduleByDayTime(dayOfWeek, time);
+      if (!deleted) {
+        // It's not an error if it didn't exist, just means nothing to delete.
+        // However, if we want to be strict, we could return an error or a specific status.
+      }
+      revalidatePath('/admin/weekly-schedule');
+      return { success: true };
+    }
+  } catch (e) {
+    const error = e instanceof Error ? e.message : "Haftalık plan yuvası kaydedilirken bir hata oluştu.";
+    console.error("Haftalık plan kaydetme hatası:", error);
+    return { success: false, error };
+  }
+}

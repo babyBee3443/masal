@@ -8,7 +8,7 @@ import { getStories } from '@/lib/mock-db';
 import { AdminStoryControls } from '@/components/admin/AdminStoryControls';
 import { GenerateStorySection } from '@/components/admin/GenerateStorySection';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, AlertTriangle, Inbox, CalendarCog } from 'lucide-react';
+import { Loader2, AlertTriangle, Inbox, CalendarCog, Repeat } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 
@@ -116,12 +116,20 @@ export default function AdminPage() {
     <div className="space-y-8">
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <h1 className="text-3xl md:text-4xl font-bold text-foreground tracking-tight">Hikaye Yönetimi</h1>
-        <Button asChild variant="outline">
-          <Link href="/admin/scheduling">
-            <CalendarCog className="mr-2 h-5 w-5" />
-            Hikaye Üretim Planlayıcısı
-          </Link>
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button asChild variant="outline">
+            <Link href="/admin/scheduling">
+              <CalendarCog className="mr-2 h-5 w-5" />
+              Tarih Bazlı Planlama
+            </Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/admin/weekly-schedule">
+              <Repeat className="mr-2 h-5 w-5" />
+              Haftalık Planlama
+            </Link>
+          </Button>
+        </div>
       </div>
       
       <GenerateStorySection onStoryGenerated={handleStoryGeneratedOrUpdated} />
@@ -147,3 +155,4 @@ export default function AdminPage() {
     </div>
   );
 }
+

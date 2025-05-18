@@ -1,4 +1,4 @@
-import type { Story, StoryGenre, ScheduledGeneration, ScheduledGenerationStatus } from '@/lib/types';
+import type { Story, StoryGenre, ScheduledGeneration, ScheduledGenerationStatus, WeeklyScheduleItem, DayOfWeek } from '@/lib/types';
 import { GENRES } from '@/lib/constants';
 
 // Helper to generate summary
@@ -99,21 +99,10 @@ export const deleteStoryById = async (id: string): Promise<boolean> => {
 };
 
 // Scheduled Generations
-let scheduledGenerations: ScheduledGeneration[] = [
-  // Example scheduled generation
-  // {
-  //   id: 'sg1',
-  //   scheduledDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 2 days from now
-  //   scheduledTime: '10:00',
-  //   genre: 'Fabl',
-  //   status: 'pending',
-  //   createdAt: new Date().toISOString(),
-  // }
-];
+let scheduledGenerations: ScheduledGeneration[] = [];
 
 export const getScheduledGenerations = async (): Promise<ScheduledGeneration[]> => {
   await new Promise(resolve => setTimeout(resolve, 50));
-  // Sort by scheduledDate and scheduledTime
   return JSON.parse(JSON.stringify(scheduledGenerations)).sort((a: ScheduledGeneration, b: ScheduledGeneration) => {
     const dateA = new Date(`${a.scheduledDate}T${a.scheduledTime}`);
     const dateB = new Date(`${b.scheduledDate}T${b.scheduledTime}`);
@@ -144,7 +133,6 @@ export const updateScheduledGenerationStatus = async (id: string, status: Schedu
   if (errorMessage) {
     scheduledGenerations[index].errorMessage = errorMessage;
   } else {
-    // Clear error message if status is not 'failed'
     delete scheduledGenerations[index].errorMessage;
   }
   return JSON.parse(JSON.stringify(scheduledGenerations[index]));
@@ -163,3 +151,43 @@ export const getScheduledGenerationById = async (id: string): Promise<ScheduledG
   return scheduledItem ? JSON.parse(JSON.stringify(scheduledItem)) : undefined;
 };
 
+// Weekly Recurring Schedules
+let weeklySchedules: WeeklyScheduleItem[] = [];
+
+export const getWeeklySchedules = async (): Promise<WeeklyScheduleItem[]> => {
+  await new Promise(resolve => setTimeout(resolve, 50));
+  return JSON.parse(JSON.stringify(weeklySchedules));
+};
+
+export const upsertWeeklySchedule = async (item: Omit<WeeklyScheduleItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<WeeklyScheduleItem> => {
+  await new Promise(resolve => setTimeout(resolve, 50));
+  const existingItemIndex = weeklySchedules.findIndex(ws => ws.dayOfWeek === item.dayOfWeek && ws.time === item.time);
+  const now = new Date().toISOString();
+
+  if (existingItemIndex > -1) {
+    // Update existing item
+    weeklySchedules[existingItemIndex] = {
+      ...weeklySchedules[existingItemIndex],
+      genre: item.genre,
+      updatedAt: now,
+    };
+    return JSON.parse(JSON.stringify(weeklySchedules[existingItemIndex]));
+  } else {
+    // Add new item
+    const newItem: WeeklyScheduleItem = {
+      ...item,
+      id: `ws-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      createdAt: now,
+      updatedAt: now,
+    };
+    weeklySchedules.push(newItem);
+    return JSON.parse(JSON.stringify(newItem));
+  }
+};
+
+export const deleteWeeklyScheduleByDayTime = async (dayOfWeek: DayOfWeek, time: string): Promise<boolean> => {
+  await new Promise(resolve => setTimeout(resolve, 50));
+  const initialLength = weeklySchedules.length;
+  weeklySchedules = weeklySchedules.filter(ws => !(ws.dayOfWeek === dayOfWeek && ws.time === time));
+  return weeklySchedules.length < initialLength;
+};

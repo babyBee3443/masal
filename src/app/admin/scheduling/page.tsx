@@ -5,7 +5,7 @@ import { useEffect, useState, useTransition } from 'react';
 import Link from 'next/link';
 import type { ScheduledGeneration, StoryGenre } from '@/lib/types';
 import { getScheduledGenerations } from '@/lib/mock-db';
-import { GENRES, APP_NAME } from '@/lib/constants';
+import { GENRES } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -31,10 +31,6 @@ import {
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-
-export const metadata = {
-  title: `Hikaye Üretim Planlayıcısı | ${APP_NAME} Admin`,
-};
 
 export default function SchedulingPage() {
   const [scheduledGenerations, setScheduledGenerations] = useState<ScheduledGeneration[]>([]);

@@ -31,8 +31,6 @@ export async function publishStoryAction(storyId: string) {
       scheduledAtTime: undefined, 
     });
     if (!updatedStory) throw new Error('Hikaye bulunamadı');
-    // Client-side will handle UI updates based on localStorage changes.
-    // revalidatePath calls might be less effective or behave differently with localStorage.
     return { success: true, story: updatedStory };
   } catch (error) {
     console.error("Hikaye yayınlanamadı:", error);
@@ -68,7 +66,7 @@ export async function generateNewStoryAction(genre: StoryGenre): Promise<{ succe
     const newStoryData: Omit<Story, 'id' | 'summary' | 'createdAt'> = {
       title: aiResult.title,
       content: aiResult.content,
-      imageUrl: aiResult.imageUrl || 'https://placehold.co/600x480.png', // Ensure placeholder for AI failure
+      imageUrl: aiResult.imageUrl || 'https://placehold.co/600x480.png', 
       genre: genre,
       status: 'pending',
     };
@@ -83,7 +81,6 @@ export async function generateNewStoryAction(genre: StoryGenre): Promise<{ succe
     } else if (typeof error === 'string') {
         errorMessage = error;
     }
-    // Attempt to parse Genkit specific errors if possible (example, adjust based on actual error structure)
     // @ts-ignore
     if (error?.details?.code === 'ABORTED' && error?.details?.message?.includes('SafetyPolicyViolation')) {
       errorMessage = 'Hikaye üretimi güvenlik politikalarını ihlal ettiği için engellendi. Lütfen farklı bir tür veya konu deneyin.';
@@ -117,7 +114,7 @@ export async function scheduleStoryPublicationAction(storyId: string, date: stri
     if (story.status === 'published') {
       return { success: false, error: "Yayınlanmış hikayeler tekrar zamanlanamaz." };
     }
-    const updatedStory = await dbUpdateStory(storyId, { scheduledAtDate: date, scheduledAtTime: time, status: 'pending' }); // Ensure status is pending
+    const updatedStory = await dbUpdateStory(storyId, { scheduledAtDate: date, scheduledAtTime: time, status: 'pending' }); 
     if (!updatedStory) {
       return { success: false, error: "Hikaye zamanlanamadı." };
     }
@@ -143,9 +140,9 @@ export async function scheduleStoryGenerationAction(
     if (!scheduledDate || !scheduledTime || !genre) {
       return { success: false, error: "Lütfen tarih, saat ve tür bilgilerini eksiksiz girin." };
     }
-    const newScheduledItem = await dbAddScheduledGeneration({ scheduledDate, scheduledTime, genre });
-    const allItems = await dbGetScheduledGenerations(); 
-    return { success: true, scheduledGeneration: newScheduledItem, allScheduledGenerations: allItems };
+    // dbAddScheduledGeneration now returns the new item and the full list
+    const { newScheduledGeneration, allItems } = await dbAddScheduledGeneration({ scheduledDate, scheduledTime, genre });
+    return { success: true, scheduledGeneration: newScheduledGeneration, allScheduledGenerations: allItems };
   } catch (e) {
     const error = e instanceof Error ? e.message : "Planlama sırasında bir hata oluştu.";
     return { success: false, error };
@@ -166,7 +163,6 @@ export async function processScheduledGenerationAction(id: string): Promise<{ su
 
     if (generationResult.success && generationResult.story) {
       await dbUpdateScheduledGenerationStatus(id, 'generated', generationResult.story.id);
-      // revalidatePath('/admin', 'layout'); // Ensure admin page updates
       return { success: true, story: generationResult.story };
     } else {
       await dbUpdateScheduledGenerationStatus(id, 'failed', undefined, generationResult.error || "Hikaye üretilemedi.");
@@ -220,5 +216,3 @@ export async function saveWeeklyScheduleSlotAction(dayOfWeek: DayOfWeek, time: s
     return { success: false, error };
   }
 }
-
-    

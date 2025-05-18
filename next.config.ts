@@ -16,6 +16,12 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      { // Add this pattern if Genkit AI images are served from here
+        protocol: 'https',
+        hostname: 'generativelanguage.googleapis.com',
+        port: '',
+        pathname: '/**',
+      }
     ],
   },
 };

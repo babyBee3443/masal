@@ -1,7 +1,9 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { getStories } from '@/lib/mock-db';
 import type { Story, StoryGenre } from '@/lib/types';
+import { GENRES } from '@/lib/constants';
 import { StoryCard } from '@/components/site/StoryCard';
 import { CategoryTabs } from '@/components/site/CategoryTabs';
 import { Input } from '@/components/ui/input';
@@ -10,21 +12,32 @@ import { Search, Sparkles } from 'lucide-react';
 import { Header } from '@/components/site/Header';
 import { Footer } from '@/components/site/Footer';
 
-interface HomePageProps {
-  searchParams: {
-    genre?: StoryGenre;
-    q?: string;
+interface CategoryPageProps {
+  params: { genre: StoryGenre };
+  searchParams: { q?: string };
+}
+
+export async function generateStaticParams() {
+  return GENRES.map(genre => ({
+    genre: genre,
+  }));
+}
+
+export async function generateMetadata({ params }: CategoryPageProps) {
+  const genre = params.genre;
+  if (!GENRES.includes(genre)) {
+    return { title: 'Category Not Found' };
+  }
+  return {
+    title: `${genre} Stories`,
+    description: `Discover captivating ${genre.toLowerCase()} stories on ChronoTales.`,
   };
 }
 
-async function StoriesList({ genre, query }: { genre?: StoryGenre; query?: string }) {
+async function StoriesForCategory({ genre, query }: { genre: StoryGenre; query?: string }) {
   let stories = await getStories();
   
-  stories = stories.filter(story => story.status === 'published');
-
-  if (genre) {
-    stories = stories.filter(story => story.genre === genre);
-  }
+  stories = stories.filter(story => story.status === 'published' && story.genre === genre);
 
   if (query) {
     const lowerCaseQuery = query.toLowerCase();
@@ -39,14 +52,12 @@ async function StoriesList({ genre, query }: { genre?: StoryGenre; query?: strin
     return (
       <div className="text-center py-12 animate-fadeIn">
         <Sparkles className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-        <h2 className="text-2xl font-semibold text-foreground mb-2">No Stories Found</h2>
+        <h2 className="text-2xl font-semibold text-foreground mb-2">No {genre} Stories Found</h2>
         <p className="text-muted-foreground mb-6">
-          It seems there are no stories matching your criteria right now.
-          { (genre || query) && " Try a different filter or search term." }
+          It seems there are no stories in this category matching your criteria right now.
+          {query && " Try a different search term, or "}
+          <Link href={`/categories/${genre}`} className="text-primary hover:underline">clear search</Link>.
         </p>
-        <Button asChild variant="outline">
-          <Link href="/">Clear Filters</Link>
-        </Button>
       </div>
     );
   }
@@ -60,44 +71,50 @@ async function StoriesList({ genre, query }: { genre?: StoryGenre; query?: strin
   );
 }
 
-export default function HomePage({ searchParams }: HomePageProps) {
-  const currentGenre = searchParams.genre;
+
+export default function CategoryPage({ params, searchParams }: CategoryPageProps) {
+  const { genre } = params;
   const searchQuery = searchParams.q;
+
+  if (!GENRES.includes(genre)) {
+    notFound();
+  }
 
   return (
     <>
       <Header />
       <main className="flex-grow container mx-auto px-4 md:px-6 py-8">
         <section className="text-center py-12 md:py-16 animate-fadeIn">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4 tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-primary via-accent to-primary">
-            Welcome to ChronoTales
+          <h1 className="text-4xl md:text-5xl font-bold mb-4 tracking-tight">
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary via-accent to-primary">
+              {genre}
+            </span> Stories
           </h1>
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-            Embark on journeys through AI-generated realms of wonder, suspense, and romance. New tales await your discovery.
+            Dive into the world of {genre.toLowerCase()} tales. Let your imagination soar.
           </p>
         </section>
 
         <section className="mb-12 animate-fadeIn" style={{ animationDelay: '0.2s' }}>
-          <form className="flex gap-2 max-w-xl mx-auto mb-8">
+           <form className="flex gap-2 max-w-xl mx-auto mb-8">
             <Input
               type="search"
               name="q"
-              placeholder="Search stories by keyword..."
+              placeholder={`Search in ${genre} stories...`}
               className="flex-grow text-base"
               defaultValue={searchQuery}
-              aria-label="Search stories"
+              aria-label={`Search in ${genre} stories`}
             />
-            {currentGenre && <input type="hidden" name="genre" value={currentGenre} />}
             <Button type="submit" variant="default" size="lg">
               <Search className="h-5 w-5 mr-0 md:mr-2" />
               <span className="hidden md:inline">Search</span>
             </Button>
           </form>
-          <CategoryTabs currentGenre={currentGenre || 'All'} basePath="/" />
+          <CategoryTabs currentGenre={genre} basePath="/categories" />
         </section>
 
         <Suspense fallback={<LoadingStories />}>
-          <StoriesList genre={currentGenre} query={searchQuery} />
+          <StoriesForCategory genre={genre} query={searchQuery} />
         </Suspense>
       </main>
       <Footer />
@@ -108,7 +125,7 @@ export default function HomePage({ searchParams }: HomePageProps) {
 function LoadingStories() {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8">
-      {[...Array(8)].map((_, i) => (
+      {[...Array(4)].map((_, i) => (
         <div key={i} className="bg-card p-4 rounded-lg shadow-md animate-pulse">
           <div className="w-full h-48 bg-muted rounded-md mb-4"></div>
           <div className="w-3/4 h-6 bg-muted rounded-md mb-2"></div>

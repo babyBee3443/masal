@@ -2,14 +2,21 @@ import type { SVGProps } from 'react';
 import { APP_NAME } from '@/lib/constants';
 
 export function Logo(props: SVGProps<SVGSVGElement>) {
+  // Adjusted viewBox for better text rendering, especially for Turkish characters.
+  // Original: viewBox="0 0 230 50"
+  // New: viewBox="0 0 230 52" (slightly taller)
+  // Original default height: 37.5, default width: 172.5
+  // New aspect ratio: 230/52 = 4.423
+  // If default height is 40, default width = 40 * 4.423 = 176.92 -> ~177
+  const defaultHeight = props.height || 40;
+  const defaultWidth = props.width || (Number(defaultHeight) * (230 / 52));
+
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 230 50" // Adjusted viewBox for icon + text
-      // Default width/height adjusted for new aspect ratio (230/50 = 4.6)
-      // Default height remains 37.5, so default width = 37.5 * 4.6 = 172.5
-      width={props.width || "172.5"}
-      height={props.height || "37.5"}
+      viewBox="0 0 230 52" // Increased height
+      width={defaultWidth}
+      height={defaultHeight}
       aria-label={`${APP_NAME} Logosu`}
       {...props} // Spreading props allows className to override width/height
     >
@@ -32,7 +39,8 @@ export function Logo(props: SVGProps<SVGSVGElement>) {
       </style>
       
       {/* Icon: Open Book (inspired by Lucide BookOpen) */}
-      <g transform="translate(10, 10) scale(1.25)" fill="url(#logoGradient)">
+      {/* Adjusted y-translate for icon to center it better in the new viewbox height */}
+      <g transform="translate(10, 11) scale(1.25)" fill="url(#logoGradient)">
         {/* Path 1 for open book */}
         <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
         {/* Path 2 for open book */}
@@ -40,7 +48,8 @@ export function Logo(props: SVGProps<SVGSVGElement>) {
       </g>
       
       {/* Text: App Name, positioned next to the icon */}
-      <text x="135" y="35" textAnchor="middle" className="logo-text">
+      {/* Adjusted y coordinate for better vertical centering and to prevent clipping */}
+      <text x="135" y="36.5" textAnchor="middle" className="logo-text">
         {APP_NAME}
       </text>
     </svg>

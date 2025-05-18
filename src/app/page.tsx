@@ -71,7 +71,7 @@ export default function HomePage({ searchParams }: HomePageProps) {
       <main className="flex-grow container mx-auto px-4 md:px-6 py-8">
         <section className="text-center py-12 md:py-16 animate-fadeIn">
           <h1 className="text-4xl md:text-5xl font-bold mb-4 tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-primary via-accent to-primary">
-            {APP_NAME}'ne Hoş Geldiniz
+            {APP_NAME}'na Hoş Geldiniz
           </h1>
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
             Yapay zeka tarafından üretilmiş merak, gerilim ve romantizm dolu diyarlarda yolculuklara çıkın. Yeni masallar keşfinizi bekliyor.

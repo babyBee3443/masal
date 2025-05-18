@@ -1,9 +1,12 @@
-import { notFound } from 'next/navigation';
+
+'use client'; // Add 'use client' for localStorage access
+import { useEffect, useState } from 'react';
+import { notFound, useParams } from 'next/navigation'; // useParams for client component
 import Image from 'next/image';
 import { getStoryById, getStories } from '@/lib/mock-db';
 import type { Story } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Loader2 } from 'lucide-react'; // Added Loader2
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { StoryCard } from '@/components/site/StoryCard';
@@ -12,51 +15,57 @@ import { Footer } from '@/components/site/Footer';
 import { Separator } from '@/components/ui/separator';
 import { APP_NAME } from '@/lib/constants';
 
-
-interface StoryPageProps {
-  params: { id: string };
-}
-
-export async function generateStaticParams() {
-  const stories = await getStories();
-  return stories.filter(s => s.status === 'published').map(story => ({
-    id: story.id,
-  }));
-}
-
-export async function generateMetadata({ params }: StoryPageProps) {
-  const story = await getStoryById(params.id);
-  if (!story || story.status !== 'published') {
-    return { title: `Hikaye Bulunamadı | ${APP_NAME}` };
-  }
-  return {
-    title: `${story.title} | ${APP_NAME}`,
-    description: story.summary,
-  };
-}
+// generateStaticParams and generateMetadata are server-side features
+// and won't work directly with localStorage as the primary data source
+// during build time. These pages will be more dynamic.
 
 async function RelatedStories({ currentStoryId, currentGenre }: { currentStoryId: string; currentGenre: Story['genre'] }) {
-  let stories = await getStories();
-  stories = stories.filter(story => 
-    story.status === 'published' && 
-    story.id !== currentStoryId &&
-    story.genre === currentGenre
-  ).slice(0, 3); // Get up to 3 related stories
+  const [relatedStories, setRelatedStories] = useState<Story[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  if (stories.length === 0) { // If no stories in same genre, get any 3 other stories
-     stories = (await getStories()).filter(story => 
+  useEffect(() => {
+    const fetchRelated = async () => {
+      setIsLoading(true);
+      let allStories = await getStories();
+      let filtered = allStories.filter(story => 
         story.status === 'published' && 
-        story.id !== currentStoryId
+        story.id !== currentStoryId &&
+        story.genre === currentGenre
       ).slice(0, 3);
+
+      if (filtered.length === 0) {
+         filtered = allStories.filter(story => 
+            story.status === 'published' && 
+            story.id !== currentStoryId
+          ).slice(0, 3);
+      }
+      setRelatedStories(filtered);
+      setIsLoading(false);
+    };
+    fetchRelated();
+  }, [currentStoryId, currentGenre]);
+
+  if (isLoading) {
+    return (
+        <div className="mt-12 md:mt-16 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(3)].map((_,i) => (
+                <div key={i} className="bg-card p-4 rounded-lg shadow-md animate-pulse">
+                    <div className="w-full h-40 bg-muted rounded-md mb-3"></div>
+                    <div className="w-2/3 h-5 bg-muted rounded-md mb-2"></div>
+                    <div className="w-full h-4 bg-muted rounded-md"></div>
+                </div>
+            ))}
+        </div>
+    );
   }
   
-  if (stories.length === 0) return null;
+  if (relatedStories.length === 0) return null;
 
   return (
     <section className="mt-12 md:mt-16 animate-fadeIn" style={{animationDelay: '0.6s'}}>
       <h2 className="text-2xl md:text-3xl font-semibold mb-6 text-center md:text-left">Benzer Masallar</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {stories.map(story => (
+        {relatedStories.map(story => (
           <StoryCard key={story.id} story={story} />
         ))}
       </div>
@@ -65,11 +74,54 @@ async function RelatedStories({ currentStoryId, currentGenre }: { currentStoryId
 }
 
 
-export default async function StoryPage({ params }: StoryPageProps) {
-  const story = await getStoryById(params.id);
+export default function StoryPage() {
+  const params = useParams();
+  const id = params.id as string;
 
-  if (!story || story.status !== 'published') {
-    notFound();
+  const [story, setStory] = useState<Story | null | undefined>(undefined); // undefined for loading state
+
+  useEffect(() => {
+    const fetchStory = async () => {
+      if (id) {
+        const fetchedStory = await getStoryById(id);
+        if (fetchedStory && fetchedStory.status === 'published') {
+          setStory(fetchedStory);
+          document.title = `${fetchedStory.title} | ${APP_NAME}`;
+        } else {
+          setStory(null); // Story not found or not published
+          document.title = `Hikaye Bulunamadı | ${APP_NAME}`;
+        }
+      }
+    };
+    fetchStory();
+  }, [id]);
+
+  if (story === undefined) { // Loading state
+    return (
+      <>
+        <Header />
+        <main className="flex-grow container mx-auto px-4 md:px-6 py-8 flex justify-center items-center min-h-[60vh]">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <p className="ml-3 text-lg text-muted-foreground">Hikaye yükleniyor...</p>
+        </main>
+        <Footer />
+      </>
+    );
+  }
+
+  if (!story) {
+    // Instead of notFound(), handle client-side for localStorage approach
+    return (
+         <>
+            <Header />
+            <main className="flex-grow container mx-auto px-4 md:px-6 py-8 text-center">
+                <h1 className="text-3xl font-bold">Hikaye Bulunamadı</h1>
+                <p className="text-muted-foreground mt-4">Aradığınız hikaye mevcut değil veya henüz yayınlanmamış.</p>
+                <Button asChild className="mt-6"><Link href="/">Ana Sayfaya Dön</Link></Button>
+            </main>
+            <Footer />
+        </>
+    );
   }
 
   const paragraphs = story.content.split('\n').filter(p => p.trim() !== '');
@@ -82,7 +134,8 @@ export default async function StoryPage({ params }: StoryPageProps) {
         <article className="max-w-3xl mx-auto">
           <div className="mb-6 animate-fadeIn">
             <Button variant="outline" asChild>
-              <Link href={searchParamsReferrer() || "/"}>
+              {/* For localStorage, router history might be more reliable if available */}
+              <Link href={typeof window !== 'undefined' && document.referrer ? document.referrer : "/"}>
                 <ArrowLeft className="mr-2 h-4 w-4" /> Hikayelere Geri Dön
               </Link>
             </Button>
@@ -107,6 +160,7 @@ export default async function StoryPage({ params }: StoryPageProps) {
               className="w-full h-auto rounded-xl object-cover shadow-xl"
               priority
               data-ai-hint="story main illustration"
+              key={story.imageUrl} // Add key to help Next/image detect changes if URL is updated
             />
           </div>
 
@@ -128,10 +182,4 @@ export default async function StoryPage({ params }: StoryPageProps) {
   );
 }
 
-// Helper for back button. In a real app, use router history or more robust referrer check.
-// For this simulation, it will default to home.
-function searchParamsReferrer(): string | null {
-  // This is a placeholder. Proper referrer handling is complex with SSR/caching.
-  // In a client component, one might use `document.referrer` or router state.
-  return null; 
-}
+    

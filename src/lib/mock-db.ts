@@ -1,5 +1,10 @@
+
 import type { Story, StoryGenre, ScheduledGeneration, ScheduledGenerationStatus, WeeklyScheduleItem, DayOfWeek } from '@/lib/types';
-import { GENRES } from '@/lib/constants';
+
+const STORIES_KEY = 'masalDunyasi_stories';
+const SCHEDULED_GENERATIONS_KEY = 'masalDunyasi_scheduledGenerations';
+const WEEKLY_SCHEDULES_KEY = 'masalDunyasi_weeklySchedules';
+const LAST_WEEKLY_CHECK_KEY = 'masalDunyasi_lastWeeklyCheck';
 
 // Helper to generate summary
 const generateSummary = (content: string, wordCount: number = 30): string => {
@@ -7,8 +12,8 @@ const generateSummary = (content: string, wordCount: number = 30): string => {
   return words.slice(0, wordCount).join(' ') + (words.length > wordCount ? '...' : '');
 };
 
-let stories: Story[] = [
-  {
+const initialStoriesData: Story[] = [
+    {
     id: '1',
     title: 'Fısıldayan Orman',
     content: 'Kadim bir ormanın kalbinde, güneş ışığının nadiren toprağa değdiği yerde Fısıldayan Orman uzanırdı. Ağaçların kendilerinin anılar taşıdığı ve eğer yakından dinlerseniz eski masalları paylaşacakları söylenirdi. Meraklı bir ruha sahip genç bir maceracı olan Elara, sadece en karanlık ayda açtığı söylenen efsanevi bir çiçeği aramak için girmeye cesaret etti. Orman, değişen yolları ve ürkütücü yankılarıyla cesaretini sınadı, ama fısıltılar aynı zamanda ona rehberlik etti, unutulmuş sihrin sırlarını ve cesaretin gerçek doğasını ortaya çıkardı. Sadece çiçeği değil, kadim dünyaya derin bir bağ buldu.',
@@ -50,23 +55,53 @@ let stories: Story[] = [
     status: 'pending',
     createdAt: new Date().toISOString(),
   }
-];
+].map(story => ({ ...story, summary: generateSummary(story.content) }));
 
-stories = stories.map(story => ({ ...story, summary: generateSummary(story.content) }));
+
+const getFromLocalStorage = <T>(key: string, defaultValue: T): T => {
+  if (typeof window === 'undefined') {
+    return defaultValue;
+  }
+  try {
+    const item = window.localStorage.getItem(key);
+    return item ? JSON.parse(item) : defaultValue;
+  } catch (error) {
+    console.warn(`Error reading localStorage key “${key}”:`, error);
+    return defaultValue;
+  }
+};
+
+const saveToLocalStorage = <T>(key: string, value: T): void => {
+  if (typeof window === 'undefined') {
+    console.warn(`localStorage is not available. Skipping save for key “${key}”.`);
+    return;
+  }
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch (error) {
+    console.warn(`Error writing to localStorage key “${key}”:`, error);
+  }
+};
 
 export const getStories = async (): Promise<Story[]> => {
-  await new Promise(resolve => setTimeout(resolve, 100));
+  // await new Promise(resolve => setTimeout(resolve, 50)); // Simulate async
+  const stories = getFromLocalStorage<Story[]>(STORIES_KEY, initialStoriesData);
+  if (stories === initialStoriesData && stories.length > 0 && typeof window !== 'undefined' && !window.localStorage.getItem(STORIES_KEY)) {
+      saveToLocalStorage(STORIES_KEY, initialStoriesData);
+  }
   return JSON.parse(JSON.stringify(stories));
 };
 
 export const getStoryById = async (id: string): Promise<Story | undefined> => {
-  await new Promise(resolve => setTimeout(resolve, 50));
+  // await new Promise(resolve => setTimeout(resolve, 20));
+  const stories = getFromLocalStorage<Story[]>(STORIES_KEY, []);
   const story = stories.find(s => s.id === id);
   return story ? JSON.parse(JSON.stringify(story)) : undefined;
 };
 
 export const addStory = async (storyData: Omit<Story, 'id' | 'summary' | 'createdAt'>): Promise<Story> => {
-  await new Promise(resolve => setTimeout(resolve, 100));
+  // await new Promise(resolve => setTimeout(resolve, 50));
+  let stories = getFromLocalStorage<Story[]>(STORIES_KEY, []);
   const newStory: Story = {
     ...storyData,
     id: String(Date.now() + Math.random()),
@@ -74,36 +109,43 @@ export const addStory = async (storyData: Omit<Story, 'id' | 'summary' | 'create
     createdAt: new Date().toISOString(),
   };
   stories.unshift(newStory);
+  saveToLocalStorage(STORIES_KEY, stories);
   return JSON.parse(JSON.stringify(newStory));
 };
 
 export const updateStory = async (id: string, updates: Partial<Omit<Story, 'id'>>): Promise<Story | undefined> => {
-  await new Promise(resolve => setTimeout(resolve, 100));
+  // await new Promise(resolve => setTimeout(resolve, 50));
+  let stories = getFromLocalStorage<Story[]>(STORIES_KEY, []);
   const storyIndex = stories.findIndex(s => s.id === id);
   if (storyIndex === -1) {
     return undefined;
   }
   const originalStory = stories[storyIndex];
   stories[storyIndex] = { ...originalStory, ...updates };
-  if (updates.content && !updates.summary) { // only update summary if content changed and summary wasn't explicitly provided
+  if (updates.content && (!updates.summary || updates.summary === originalStory.summary)) {
     stories[storyIndex].summary = generateSummary(updates.content);
   }
+  saveToLocalStorage(STORIES_KEY, stories);
   return JSON.parse(JSON.stringify(stories[storyIndex]));
 };
 
 export const deleteStoryById = async (id: string): Promise<boolean> => {
-  await new Promise(resolve => setTimeout(resolve, 100));
+  // await new Promise(resolve => setTimeout(resolve, 50));
+  let stories = getFromLocalStorage<Story[]>(STORIES_KEY, []);
   const initialLength = stories.length;
   stories = stories.filter(s => s.id !== id);
+  saveToLocalStorage(STORIES_KEY, stories);
   return stories.length < initialLength;
 };
 
 // Scheduled Generations
-let scheduledGenerations: ScheduledGeneration[] = [];
-
 export const getScheduledGenerations = async (): Promise<ScheduledGeneration[]> => {
-  await new Promise(resolve => setTimeout(resolve, 50));
-  return JSON.parse(JSON.stringify(scheduledGenerations)).sort((a: ScheduledGeneration, b: ScheduledGeneration) => {
+  // await new Promise(resolve => setTimeout(resolve, 20));
+  const items = getFromLocalStorage<ScheduledGeneration[]>(SCHEDULED_GENERATIONS_KEY, []);
+  if(items.length === 0 && typeof window !== 'undefined' && !window.localStorage.getItem(SCHEDULED_GENERATIONS_KEY)) {
+    saveToLocalStorage(SCHEDULED_GENERATIONS_KEY, []);
+  }
+  return JSON.parse(JSON.stringify(items)).sort((a: ScheduledGeneration, b: ScheduledGeneration) => {
     const dateA = new Date(`${a.scheduledDate}T${a.scheduledTime}`);
     const dateB = new Date(`${b.scheduledDate}T${b.scheduledTime}`);
     return dateA.getTime() - dateB.getTime();
@@ -111,83 +153,106 @@ export const getScheduledGenerations = async (): Promise<ScheduledGeneration[]> 
 };
 
 export const addScheduledGeneration = async (data: Omit<ScheduledGeneration, 'id' | 'status' | 'createdAt'>): Promise<ScheduledGeneration> => {
-  await new Promise(resolve => setTimeout(resolve, 50));
+  // await new Promise(resolve => setTimeout(resolve, 20));
+  let items = getFromLocalStorage<ScheduledGeneration[]>(SCHEDULED_GENERATIONS_KEY, []);
   const newScheduledGeneration: ScheduledGeneration = {
     ...data,
     id: `sg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     status: 'pending',
     createdAt: new Date().toISOString(),
   };
-  scheduledGenerations.push(newScheduledGeneration);
+  items.push(newScheduledGeneration);
+  saveToLocalStorage(SCHEDULED_GENERATIONS_KEY, items);
   return JSON.parse(JSON.stringify(newScheduledGeneration));
 };
 
 export const updateScheduledGenerationStatus = async (id: string, status: ScheduledGenerationStatus, generatedStoryId?: string, errorMessage?: string): Promise<ScheduledGeneration | undefined> => {
-  await new Promise(resolve => setTimeout(resolve, 50));
-  const index = scheduledGenerations.findIndex(sg => sg.id === id);
+  // await new Promise(resolve => setTimeout(resolve, 20));
+  let items = getFromLocalStorage<ScheduledGeneration[]>(SCHEDULED_GENERATIONS_KEY, []);
+  const index = items.findIndex(sg => sg.id === id);
   if (index === -1) return undefined;
-  scheduledGenerations[index].status = status;
+  items[index].status = status;
   if (generatedStoryId) {
-    scheduledGenerations[index].generatedStoryId = generatedStoryId;
+    items[index].generatedStoryId = generatedStoryId;
   }
   if (errorMessage) {
-    scheduledGenerations[index].errorMessage = errorMessage;
+    items[index].errorMessage = errorMessage;
   } else {
-    delete scheduledGenerations[index].errorMessage;
+    delete items[index].errorMessage;
   }
-  return JSON.parse(JSON.stringify(scheduledGenerations[index]));
+  saveToLocalStorage(SCHEDULED_GENERATIONS_KEY, items);
+  return JSON.parse(JSON.stringify(items[index]));
 };
 
 export const deleteScheduledGenerationById = async (id: string): Promise<boolean> => {
-  await new Promise(resolve => setTimeout(resolve, 50));
-  const initialLength = scheduledGenerations.length;
-  scheduledGenerations = scheduledGenerations.filter(sg => sg.id !== id);
-  return scheduledGenerations.length < initialLength;
+  // await new Promise(resolve => setTimeout(resolve, 20));
+  let items = getFromLocalStorage<ScheduledGeneration[]>(SCHEDULED_GENERATIONS_KEY, []);
+  const initialLength = items.length;
+  items = items.filter(sg => sg.id !== id);
+  saveToLocalStorage(SCHEDULED_GENERATIONS_KEY, items);
+  return items.length < initialLength;
 };
 
 export const getScheduledGenerationById = async (id: string): Promise<ScheduledGeneration | undefined> => {
-  await new Promise(resolve => setTimeout(resolve, 50));
-  const scheduledItem = scheduledGenerations.find(s => s.id === id);
+  // await new Promise(resolve => setTimeout(resolve, 20));
+  const items = getFromLocalStorage<ScheduledGeneration[]>(SCHEDULED_GENERATIONS_KEY, []);
+  const scheduledItem = items.find(s => s.id === id);
   return scheduledItem ? JSON.parse(JSON.stringify(scheduledItem)) : undefined;
 };
 
 // Weekly Recurring Schedules
-let weeklySchedules: WeeklyScheduleItem[] = [];
-
 export const getWeeklySchedules = async (): Promise<WeeklyScheduleItem[]> => {
-  await new Promise(resolve => setTimeout(resolve, 50));
-  return JSON.parse(JSON.stringify(weeklySchedules));
+  // await new Promise(resolve => setTimeout(resolve, 20));
+  const items = getFromLocalStorage<WeeklyScheduleItem[]>(WEEKLY_SCHEDULES_KEY, []);
+   if(items.length === 0 && typeof window !== 'undefined' && !window.localStorage.getItem(WEEKLY_SCHEDULES_KEY)) {
+    saveToLocalStorage(WEEKLY_SCHEDULES_KEY, []);
+  }
+  return JSON.parse(JSON.stringify(items));
 };
 
 export const upsertWeeklySchedule = async (item: Omit<WeeklyScheduleItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<WeeklyScheduleItem> => {
-  await new Promise(resolve => setTimeout(resolve, 50));
-  const existingItemIndex = weeklySchedules.findIndex(ws => ws.dayOfWeek === item.dayOfWeek && ws.time === item.time);
+  // await new Promise(resolve => setTimeout(resolve, 20));
+  let items = getFromLocalStorage<WeeklyScheduleItem[]>(WEEKLY_SCHEDULES_KEY, []);
+  const existingItemIndex = items.findIndex(ws => ws.dayOfWeek === item.dayOfWeek && ws.time === item.time);
   const now = new Date().toISOString();
 
   if (existingItemIndex > -1) {
-    // Update existing item
-    weeklySchedules[existingItemIndex] = {
-      ...weeklySchedules[existingItemIndex],
+    items[existingItemIndex] = {
+      ...items[existingItemIndex],
       genre: item.genre,
       updatedAt: now,
     };
-    return JSON.parse(JSON.stringify(weeklySchedules[existingItemIndex]));
+    saveToLocalStorage(WEEKLY_SCHEDULES_KEY, items);
+    return JSON.parse(JSON.stringify(items[existingItemIndex]));
   } else {
-    // Add new item
     const newItem: WeeklyScheduleItem = {
       ...item,
       id: `ws-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       createdAt: now,
       updatedAt: now,
     };
-    weeklySchedules.push(newItem);
+    items.push(newItem);
+    saveToLocalStorage(WEEKLY_SCHEDULES_KEY, items);
     return JSON.parse(JSON.stringify(newItem));
   }
 };
 
 export const deleteWeeklyScheduleByDayTime = async (dayOfWeek: DayOfWeek, time: string): Promise<boolean> => {
-  await new Promise(resolve => setTimeout(resolve, 50));
-  const initialLength = weeklySchedules.length;
-  weeklySchedules = weeklySchedules.filter(ws => !(ws.dayOfWeek === dayOfWeek && ws.time === time));
-  return weeklySchedules.length < initialLength;
+  // await new Promise(resolve => setTimeout(resolve, 20));
+  let items = getFromLocalStorage<WeeklyScheduleItem[]>(WEEKLY_SCHEDULES_KEY, []);
+  const initialLength = items.length;
+  items = items.filter(ws => !(ws.dayOfWeek === dayOfWeek && ws.time === time));
+  saveToLocalStorage(WEEKLY_SCHEDULES_KEY, items);
+  return items.length < initialLength;
 };
+
+// Helper for weekly schedule check time
+export const getLastWeeklyCheckTime = async (): Promise<string | null> => {
+    return getFromLocalStorage<string | null>(LAST_WEEKLY_CHECK_KEY, null);
+}
+
+export const setLastWeeklyCheckTime = async (time: string): Promise<void> => {
+    saveToLocalStorage(LAST_WEEKLY_CHECK_KEY, time);
+}
+
+    

@@ -1,57 +1,80 @@
-import { Suspense } from 'react';
+
+'use client'; // Add 'use client' for localStorage access in getStories
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, useParams, useSearchParams as useNextSearchParams } from 'next/navigation'; // Import Next.js hooks directly
 import { getStories } from '@/lib/mock-db';
 import type { Story, StoryGenre } from '@/lib/types';
-import { GENRES } from '@/lib/constants';
+import { GENRES, APP_NAME } from '@/lib/constants';
 import { StoryCard } from '@/components/site/StoryCard';
 import { CategoryTabs } from '@/components/site/CategoryTabs';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Sparkles } from 'lucide-react';
+import { Search, Sparkles, Loader2 } from 'lucide-react'; // Added Loader2
 import { Header } from '@/components/site/Header';
 import { Footer } from '@/components/site/Footer';
 
-interface CategoryPageProps {
-  params: { genre: StoryGenre };
-  searchParams: { q?: string };
-}
 
-export async function generateStaticParams() {
-  return GENRES.map(genre => ({
-    genre: genre,
-  }));
-}
+// generateStaticParams might not work as expected with localStorage data source
+// For a localStorage-based prototype, we can make these pages fully dynamic.
+// export async function generateStaticParams() {
+//   return GENRES.map(genre => ({
+//     genre: genre,
+//   }));
+// }
 
-export async function generateMetadata({ params }: CategoryPageProps) {
-  const genre = params.genre;
-  if (!GENRES.includes(genre)) {
-    return { title: 'Kategori Bulunamadı' };
+// Metadata generation also relies on server-side data.
+// For localStorage, title can be set client-side or be more generic.
+// export async function generateMetadata({ params }: CategoryPageProps) {
+//   const genre = params.genre;
+//   if (!GENRES.includes(genre)) {
+//     return { title: 'Kategori Bulunamadı' };
+//   }
+//   const capitalizedGenre = genre.charAt(0).toUpperCase() + genre.slice(1).toLowerCase();
+//   return {
+//     title: `${capitalizedGenre} Hikayeleri`,
+//     description: `${APP_NAME} üzerinde büyüleyici ${genre.toLowerCase()} hikayelerini keşfedin.`,
+//   };
+// }
+
+function StoriesForCategory({ genre, query }: { genre: StoryGenre; query?: string }) {
+  const [stories, setStories] = useState<Story[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchAndSetStories = async () => {
+      setIsLoading(true);
+      let allStories = await getStories();
+      
+      allStories = allStories.filter(story => story.status === 'published' && story.genre === genre);
+
+      if (query) {
+        const lowerCaseQuery = query.toLowerCase();
+        allStories = allStories.filter(story => 
+          story.title.toLowerCase().includes(lowerCaseQuery) ||
+          (story.summary && story.summary.toLowerCase().includes(lowerCaseQuery)) ||
+          story.content.toLowerCase().includes(lowerCaseQuery)
+        );
+      }
+      setStories(allStories);
+      setIsLoading(false);
+    };
+
+    if (genre) { // Only fetch if genre is valid
+        fetchAndSetStories();
+    } else {
+        setIsLoading(false); // No genre, no stories to load for this component
+        setStories([]);
+    }
+  }, [genre, query]);
+
+
+  if (isLoading) {
+    return <LoadingStoriesPlaceholder />;
   }
-  // Capitalize genre for title
-  const capitalizedGenre = genre.charAt(0).toUpperCase() + genre.slice(1).toLowerCase();
-  return {
-    title: `${capitalizedGenre} Hikayeleri`,
-    description: `${APP_NAME} üzerinde büyüleyici ${genre.toLowerCase()} hikayelerini keşfedin.`,
-  };
-}
-
-async function StoriesForCategory({ genre, query }: { genre: StoryGenre; query?: string }) {
-  let stories = await getStories();
   
-  stories = stories.filter(story => story.status === 'published' && story.genre === genre);
+  const capitalizedGenreDisplay = genre ? genre.charAt(0).toUpperCase() + genre.slice(1).toLowerCase() : "Bilinmeyen Kategori";
 
-  if (query) {
-    const lowerCaseQuery = query.toLowerCase();
-    stories = stories.filter(story => 
-      story.title.toLowerCase().includes(lowerCaseQuery) ||
-      story.summary.toLowerCase().includes(lowerCaseQuery) ||
-      story.content.toLowerCase().includes(lowerCaseQuery)
-    );
-  }
-
-  // Capitalize genre for display
-  const capitalizedGenreDisplay = genre.charAt(0).toUpperCase() + genre.slice(1).toLowerCase();
 
   if (stories.length === 0) {
     return (
@@ -77,14 +100,50 @@ async function StoriesForCategory({ genre, query }: { genre: StoryGenre; query?:
 }
 
 
-export default function CategoryPage({ params, searchParams }: CategoryPageProps) {
-  const { genre } = params;
-  const searchQuery = searchParams.q;
+export default function CategoryPage() {
+  const params = useParams();
+  const searchParams = useNextSearchParams(); // Use the Next.js hook
 
-  if (!GENRES.includes(genre)) {
-    notFound();
+  const genre = params.genre as StoryGenre; // Assuming genre is always string from params
+  const searchQuery = searchParams.get('q') || undefined; // Get 'q' from searchParams
+
+  useEffect(() => {
+    if (genre) {
+        const capitalizedGenre = genre.charAt(0).toUpperCase() + genre.slice(1).toLowerCase();
+        document.title = `${capitalizedGenre} Hikayeleri | ${APP_NAME}`;
+    } else {
+        document.title = `Kategoriler | ${APP_NAME}`;
+    }
+  }, [genre]);
+
+
+  if (!genre || !GENRES.includes(genre)) {
+    // Instead of notFound(), which is server-side, handle client-side
+    // You could redirect or show a "category not found" message here.
+    // For simplicity, we'll just show a message if genre is invalid.
+    // A robust solution would involve checking GENRES before rendering.
+     useEffect(() => {
+        if (!GENRES.includes(genre)) {
+            // router.push('/404') or show a specific component
+            console.warn("Geçersiz kategori:", genre);
+        }
+    }, [genre]);
+
+    if (!GENRES.includes(genre)) {
+        return (
+             <>
+                <Header />
+                <main className="flex-grow container mx-auto px-4 md:px-6 py-8 text-center">
+                    <h1 className="text-3xl font-bold">Kategori Bulunamadı</h1>
+                    <p className="text-muted-foreground mt-4">Aradığınız kategori mevcut değil.</p>
+                    <Button asChild className="mt-6"><Link href="/">Ana Sayfaya Dön</Link></Button>
+                </main>
+                <Footer />
+            </>
+        )
+    }
   }
-  // Capitalize genre for display
+  
   const capitalizedGenreDisplay = genre.charAt(0).toUpperCase() + genre.slice(1).toLowerCase();
 
   return (
@@ -120,16 +179,14 @@ export default function CategoryPage({ params, searchParams }: CategoryPageProps
           <CategoryTabs currentGenre={genre} basePath="/categories" />
         </section>
 
-        <Suspense fallback={<LoadingStories />}>
-          <StoriesForCategory genre={genre} query={searchQuery} />
-        </Suspense>
+        <StoriesForCategory genre={genre} query={searchQuery} />
       </main>
       <Footer />
     </>
   );
 }
 
-function LoadingStories() {
+function LoadingStoriesPlaceholder() { // Renamed from LoadingStories to avoid conflict if used elsewhere
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8">
       {[...Array(4)].map((_, i) => (
@@ -145,3 +202,5 @@ function LoadingStories() {
     </div>
   );
 }
+
+    

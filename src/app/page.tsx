@@ -1,4 +1,6 @@
-import { Suspense } from 'react';
+
+'use client'; // Add 'use client' for localStorage access in getStories
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { getStories } from '@/lib/mock-db';
 import type { Story, StoryGenre } from '@/lib/types';
@@ -6,7 +8,7 @@ import { StoryCard } from '@/components/site/StoryCard';
 import { CategoryTabs } from '@/components/site/CategoryTabs';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Sparkles } from 'lucide-react';
+import { Search, Sparkles, Loader2 } from 'lucide-react'; // Added Loader2
 import { Header } from '@/components/site/Header';
 import { Footer } from '@/components/site/Footer';
 import { APP_NAME } from '@/lib/constants';
@@ -18,22 +20,38 @@ interface HomePageProps {
   };
 }
 
-async function StoriesList({ genre, query }: { genre?: StoryGenre; query?: string }) {
-  let stories = await getStories();
-  
-  stories = stories.filter(story => story.status === 'published');
+function StoriesList({ genre, query }: { genre?: StoryGenre; query?: string }) {
+  const [stories, setStories] = useState<Story[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  if (genre) {
-    stories = stories.filter(story => story.genre === genre);
-  }
+  useEffect(() => {
+    const fetchAndSetStories = async () => {
+      setIsLoading(true);
+      let allStories = await getStories();
+      
+      allStories = allStories.filter(story => story.status === 'published');
 
-  if (query) {
-    const lowerCaseQuery = query.toLowerCase();
-    stories = stories.filter(story => 
-      story.title.toLowerCase().includes(lowerCaseQuery) ||
-      story.summary.toLowerCase().includes(lowerCaseQuery) ||
-      story.content.toLowerCase().includes(lowerCaseQuery)
-    );
+      if (genre) {
+        allStories = allStories.filter(story => story.genre === genre);
+      }
+
+      if (query) {
+        const lowerCaseQuery = query.toLowerCase();
+        allStories = allStories.filter(story => 
+          story.title.toLowerCase().includes(lowerCaseQuery) ||
+          (story.summary && story.summary.toLowerCase().includes(lowerCaseQuery)) || // Check if summary exists
+          story.content.toLowerCase().includes(lowerCaseQuery)
+        );
+      }
+      setStories(allStories);
+      setIsLoading(false);
+    };
+
+    fetchAndSetStories();
+  }, [genre, query]);
+
+  if (isLoading) {
+    return <LoadingStories />;
   }
 
   if (stories.length === 0) {
@@ -64,6 +82,14 @@ async function StoriesList({ genre, query }: { genre?: StoryGenre; query?: strin
 export default function HomePage({ searchParams }: HomePageProps) {
   const currentGenre = searchParams.genre;
   const searchQuery = searchParams.q;
+
+  // This ensures that on the client, if searchParams change, the component re-renders
+  // and StoriesList (which is client-side due to useEffect) re-fetches.
+  const [key, setKey] = useState(0);
+  useEffect(() => {
+    setKey(prev => prev + 1);
+  }, [currentGenre, searchQuery]);
+
 
   return (
     <>
@@ -97,9 +123,8 @@ export default function HomePage({ searchParams }: HomePageProps) {
           <CategoryTabs currentGenre={currentGenre || 'Tümü'} basePath="/" />
         </section>
 
-        <Suspense fallback={<LoadingStories />}>
-          <StoriesList genre={currentGenre} query={searchQuery} />
-        </Suspense>
+        {/* Suspense is less critical here if StoriesList handles its own loading state */}
+        <StoriesList key={key} genre={currentGenre} query={searchQuery} />
       </main>
       <Footer />
     </>
@@ -122,3 +147,5 @@ function LoadingStories() {
     </div>
   );
 }
+
+    

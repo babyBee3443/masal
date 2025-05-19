@@ -19,7 +19,7 @@ import { APP_NAME } from '@/lib/constants';
 // and won't work directly with localStorage as the primary data source
 // during build time. These pages will be more dynamic.
 
-async function RelatedStories({ currentStoryId, currentGenre }: { currentStoryId: string; currentGenre: Story['genre'] }) {
+function RelatedStories({ currentStoryId, currentGenre }: { currentStoryId: string; currentGenre: Story['genre'] }) {
   const [relatedStories, setRelatedStories] = useState<Story[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 

@@ -9,9 +9,10 @@ import {
     getScheduledGenerations, 
     addScheduledGeneration as dbAddScheduledGeneration,
     deleteScheduledGenerationById as dbDeleteScheduledGenerationById,
-    updateScheduledGenerationStatus as dbUpdateScheduledGenerationStatus
+    updateScheduledGenerationStatus as dbUpdateScheduledGenerationStatus,
+    addStory as dbAddStory // Import dbAddStory
 } from '@/lib/mock-db'; 
-import { GENRES } from '@/lib/constants';
+import { GENRES, APP_NAME } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -40,9 +41,9 @@ import { Separator } from '@/components/ui/separator';
 
 export default function SchedulingPage() {
   const [scheduledGenerations, setScheduledGenerations] = useState<ScheduledGeneration[]>([]);
-  const [isLoadingPage, setIsLoadingPage] = useState(true); // Renamed for clarity
+  const [isLoadingPage, setIsLoadingPage] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isSavingOrDeleting, startSavingOrDeletingTransition] = useTransition(); // For add/delete
+  const [isSavingOrDeleting, startSavingOrDeletingTransition] = useTransition();
   const { toast } = useToast();
 
   const [newScheduleDate, setNewScheduleDate] = useState<Date | undefined>(new Date());
@@ -50,7 +51,7 @@ export default function SchedulingPage() {
   const [newScheduleGenre, setNewScheduleGenre] = useState<StoryGenre | undefined>(undefined);
   
   const [autoProcessingAttemptedOnLoad, setAutoProcessingAttemptedOnLoad] = useState(false);
-  const [processingItems, setProcessingItems] = useState<Set<string>>(new Set()); // Tracks IDs of items being processed
+  const [processingItems, setProcessingItems] = useState<Set<string>>(new Set());
 
   const fetchScheduledItems = async (isManualRefresh = false) => {
     if (!isManualRefresh && !autoProcessingAttemptedOnLoad) {
@@ -63,7 +64,7 @@ export default function SchedulingPage() {
       
       const dueItems = items.filter(item => {
         if (item.status !== 'pending') return false;
-        if (processingItems.has(item.id)) return false; // Don't re-process if already processing
+        if (processingItems.has(item.id)) return false; 
         try {
           const scheduledDateTime = parseISO(`${item.scheduledDate}T${item.scheduledTime}`);
           return isValid(scheduledDateTime) && scheduledDateTime <= now;
@@ -88,11 +89,12 @@ export default function SchedulingPage() {
           try {
             const result = await processScheduledGenerationAction(item.id); 
             if (result.success && result.story && result.scheduledGenerationId) {
-              await dbUpdateScheduledGenerationStatus(result.scheduledGenerationId, 'generated', result.story.id);
+              const newStory = await dbAddStory(result.story); // Save story to localStorage
+              await dbUpdateScheduledGenerationStatus(result.scheduledGenerationId, 'generated', newStory.id);
               toast({
                 variant: "default",
                 title: "Otomatik Hikaye Üretildi!",
-                description: `"${result.story.title}" (${item.genre}) başarıyla oluşturuldu. Admin paneline giderek görebilirsiniz.`,
+                description: `"${newStory.title}" (${item.genre}) başarıyla oluşturuldu. Admin paneline giderek görebilirsiniz.`,
                 action: <CheckCircle className="text-green-500" />,
               });
             } else if (result.success && !result.story && result.scheduledGenerationId) { 
@@ -128,7 +130,7 @@ export default function SchedulingPage() {
         await Promise.allSettled(processingPromises);
         
         if (!autoProcessingAttemptedOnLoad && !isManualRefresh) setAutoProcessingAttemptedOnLoad(true);
-        items = await getScheduledGenerations(); 
+        items = await getScheduledGenerations(); // Re-fetch after all processing attempts
       }
       
       setScheduledGenerations(items);
@@ -155,14 +157,16 @@ export default function SchedulingPage() {
       const actionResult = await scheduleStoryGenerationAction(dateString, newScheduleTime, newScheduleGenre);
       
       if (actionResult.success && actionResult.newScheduledGenerationData) {
+        // Client directly calls mock-db to add and get the updated list
         const { newScheduledGeneration, allItems } = await dbAddScheduledGeneration(actionResult.newScheduledGenerationData);
         
         toast({ 
           title: 'Hikaye Üretimi Planlandı', 
           description: `${newScheduledGeneration.genre} türünde hikaye ${formatDateDisplay(newScheduledGeneration.scheduledDate, newScheduledGeneration.scheduledTime)} için planlandı.` 
         });
-        setScheduledGenerations(allItems);
+        setScheduledGenerations(allItems); // Update state with the full list from mock-db
         
+        // Reset form fields
         setNewScheduleDate(new Date());
         setNewScheduleTime("10:00");
         setNewScheduleGenre(undefined);
@@ -184,17 +188,20 @@ export default function SchedulingPage() {
       description: `"${itemToProcess.genre}" türündeki hikaye şimdi üretiliyor...`
     });
 
-    startSavingOrDeletingTransition(async () => { // Use the same transition for all modifications
+    startSavingOrDeletingTransition(async () => { 
       try {
         const result = await processScheduledGenerationAction(id);
         if (result.success && result.story && result.scheduledGenerationId) {
-          await dbUpdateScheduledGenerationStatus(result.scheduledGenerationId, 'generated', result.story.id);
-          toast({ title: 'Hikaye Üretildi!', description: `"${result.story.title}" başarıyla oluşturuldu. Admin panelinde görebilirsiniz.` });
-        } else if (result.scheduledGenerationId) {
-          await dbUpdateScheduledGenerationStatus(result.scheduledGenerationId, 'failed', undefined, result.error || "Üretim Başarısız");
-          toast({ variant: 'destructive', title: 'Üretim Başarısız', description: result.error });
-        } else {
+          const newStory = await dbAddStory(result.story);
+          await dbUpdateScheduledGenerationStatus(result.scheduledGenerationId, 'generated', newStory.id);
+          toast({ title: 'Hikaye Üretildi!', description: `"${newStory.title}" başarıyla oluşturuldu. Admin panelinde görebilirsiniz.` });
+        } else if (result.scheduledGenerationId) { // Handle cases where story might not be fully formed but action still has context
+          await dbUpdateScheduledGenerationStatus(result.scheduledGenerationId, 'failed', undefined, result.error || "Üretim Başarısız oldu, hikaye detayı alınamadı.");
+          toast({ variant: 'destructive', title: 'Üretim Başarısız', description: result.error || "Hikaye detayı alınamadı." });
+        } else { // General failure from action
            toast({ variant: 'destructive', title: 'Üretim Hatası', description: result.error || "Bilinmeyen bir hata oluştu." });
+           // Attempt to mark as failed if ID is known, though result.scheduledGenerationId should exist
+           if(itemToProcess.id) await dbUpdateScheduledGenerationStatus(itemToProcess.id, 'failed', undefined, result.error || "Bilinmeyen bir hata oluştu.");
         }
       } catch (e) {
         toast({ variant: 'destructive', title: 'İşlem Sırasında Hata', description: e instanceof Error ? e.message : "Bilinmeyen bir hata." });
@@ -216,9 +223,10 @@ export default function SchedulingPage() {
     startSavingOrDeletingTransition(async () => {
       const actionResult = await deleteScheduledGenerationAction(id);
       if (actionResult.success && actionResult.scheduledGenerationIdToDelete) {
+        // Client directly calls mock-db to delete
         await dbDeleteScheduledGenerationById(actionResult.scheduledGenerationIdToDelete);
         toast({ title: 'Plan Silindi', description: `${genre} türündeki ${formatDateDisplay(date, time)} tarihli plan silindi.` });
-        fetchScheduledItems(true);
+        fetchScheduledItems(true); // Refresh list from localStorage
       } else {
         toast({ variant: 'destructive', title: 'Silme Başarısız', description: actionResult.error });
       }

@@ -4,6 +4,7 @@
 
 import type { Story, StoryGenre, ScheduledGeneration, WeeklyScheduleItem, DayOfWeek } from '@/lib/types';
 import type { StoryLength, StoryComplexity } from '@/lib/constants';
+import { sendApprovalEmail } from '@/lib/email-service'; // Import the email service
 
 
 import { generateStory as aiGenerateStory } from '@/ai/flows/generate-story';
@@ -14,6 +15,7 @@ import { regenerateAIImage as aiRegenerateAIImage } from '@/ai/flows/generate-im
 // 1. AI interactions (which must run server-side).
 // 2. Data validation/preparation before client handles localStorage.
 // 3. Reading data if a server component needs it (though prefer client for localStorage consistency).
+// 4. Triggering side effects like sending emails.
 
 export async function publishStoryAction(storyId: string) {
   console.warn("publishStoryAction (server): Client should handle localStorage update. This action now only returns data for the client to act upon.");
@@ -74,10 +76,6 @@ export async function generateNewStoryAction(
       throw new Error(specificError);
     }
     
-    // TODO: getdusbox@gmail.com adresine onay e-postası gönderilecek (hikaye içeriği ve onay bağlantısı ile).
-    // E-posta gönderim kodu burada olmalı, bir e-posta servisi (örn: Nodemailer, SendGrid) kullanarak.
-    // Örnek: await sendApprovalEmail('getdusbox@gmail.com', aiResult.title, aiResult.content);
-
     const newStoryData: Omit<Story, 'id' | 'summary' | 'createdAt'> = {
       title: aiResult.title,
       content: aiResult.content,
@@ -86,6 +84,19 @@ export async function generateNewStoryAction(
       status: 'awaiting_approval', // New stories now await approval
     };
     console.log(`[Action] generateNewStoryAction: Story data prepared successfully for genre: ${genre}, status: 'awaiting_approval'`);
+
+    // Attempt to send approval email if the story is awaiting approval
+    if (newStoryData.status === 'awaiting_approval') {
+      console.log(`[Action] generateNewStoryAction: Attempting to send approval email for "${newStoryData.title}"`);
+      const emailSent = await sendApprovalEmail(newStoryData.title, newStoryData.content);
+      if (emailSent) {
+        console.log(`[Action] generateNewStoryAction: Approval email successfully queued for "${newStoryData.title}".`);
+      } else {
+        console.warn(`[Action] generateNewStoryAction: Failed to send approval email for "${newStoryData.title}". Proceeding without email.`);
+        // You might want to handle this case more specifically, e.g., by returning a specific error or flag to the client.
+      }
+    }
+
     return { success: true, storyData: newStoryData };
   } catch (error) {
     console.error(`[Action] generateNewStoryAction: Error generating new story for genre ${genre}:`, error);
@@ -143,14 +154,14 @@ export async function scheduleStoryGenerationAction(
   genre: StoryGenre
 ): Promise<{ 
   success: boolean; 
-  newScheduledGenerationData?: Omit<ScheduledGeneration, 'id' | 'status' | 'createdAt'>; // Data for client to add to localStorage
+  newScheduledGenerationData?: Omit<ScheduledGeneration, 'id' | 'status' | 'createdAt'>; 
   error?: string 
 }> {
-  console.log(`[Action] scheduleStoryGenerationAction: Received date: ${scheduledDate}, time: ${scheduledTime}, genre: ${genre}`);
+  console.log(`[Action] scheduleStoryGenerationAction: Server action received date: ${scheduledDate}, time: ${scheduledTime}, genre: ${genre}. Preparing data for client.`);
   try {
     if (!scheduledDate || !scheduledTime || !genre) {
-      console.error("[Action] scheduleStoryGenerationAction: Missing date, time, or genre.");
-      return { success: false, error: "Lütfen tarih, saat ve tür bilgilerini eksiksiz girin." };
+      console.error("[Action] scheduleStoryGenerationAction: Missing date, time, or genre from client.");
+      return { success: false, error: "Sunucu: Lütfen tarih, saat ve tür bilgilerini eksiksiz girin." };
     }
     // This action now only prepares the data. Client will use dbAddScheduledGeneration.
     const newScheduledGenerationData: Omit<ScheduledGeneration, 'id' | 'status' | 'createdAt'> = {
@@ -161,30 +172,30 @@ export async function scheduleStoryGenerationAction(
     console.log("[Action] scheduleStoryGenerationAction: Prepared data for client:", newScheduledGenerationData);
     return { success: true, newScheduledGenerationData };
   } catch (e) {
-    const error = e instanceof Error ? e.message : "Planlama sırasında bir hata oluştu (sunucu).";
-    console.error("[Action] scheduleStoryGenerationAction: Error:", error);
+    const error = e instanceof Error ? e.message : "Planlama sırasında bir sunucu hatası oluştu.";
+    console.error("[Action] scheduleStoryGenerationAction: Error on server:", error);
     return { success: false, error };
   }
 }
 
 export async function processScheduledGenerationAction(id: string, genre: StoryGenre): Promise<{ 
   success: boolean; 
-  storyData?: Omit<Story, 'id' | 'summary' | 'createdAt'>; // Data for the new story (status will be 'awaiting_approval')
+  storyData?: Omit<Story, 'id' | 'summary' | 'createdAt'>; 
   error?: string; 
-  scheduledGenerationId: string; // ID of the scheduled item to update its status
+  scheduledGenerationId: string; 
 }> {
   console.log(`[Action] processScheduledGenerationAction: Processing ID: ${id} for Genre: ${genre}`);
   
   try {
-    const generationResult = await generateNewStoryAction(genre, undefined, undefined); // Uses default length/complexity
+    // The 'genre' parameter is now directly available from the client call.
+    const generationResult = await generateNewStoryAction(genre, undefined, undefined); 
 
     if (generationResult.success && generationResult.storyData) {
       console.log(`[Action] processScheduledGenerationAction: Story generated successfully for ID: ${id}, Genre: ${genre}. Status: ${generationResult.storyData.status}`);
-      // TODO: getdusbox@gmail.com adresine onay e-postası gönderilecek (hikaye içeriği ve onay bağlantısı ile).
-      // Örnek: await sendApprovalEmail('getdusbox@gmail.com', generationResult.storyData.title, generationResult.storyData.content);
+      // Email sending is now handled within generateNewStoryAction if status is 'awaiting_approval'
       return { 
         success: true, 
-        storyData: generationResult.storyData, // This will have status: 'awaiting_approval'
+        storyData: generationResult.storyData, 
         scheduledGenerationId: id,
       };
     } else {
@@ -223,26 +234,24 @@ export async function getWeeklySchedulesAction(): Promise<{ success: boolean; sc
 export async function saveWeeklyScheduleSlotAction(
   dayOfWeek: DayOfWeek, 
   time: string, 
-  genre: StoryGenre | null // Allow null to clear a slot
+  genre: StoryGenre | null 
 ): Promise<{ 
   success: boolean; 
-  slotToSave?: { dayOfWeek: DayOfWeek; time: string; genre: StoryGenre | null }; // Data for client to upsert/delete in localStorage
+  slotToSave?: { dayOfWeek: DayOfWeek; time: string; genre: StoryGenre | null }; 
   error?: string; 
 }> {
-  console.log(`[Action] saveWeeklyScheduleSlotAction: Received day: ${dayOfWeek}, time: ${time}, genre: ${genre}`);
+  console.log(`[Action] saveWeeklyScheduleSlotAction: Server action received day: ${dayOfWeek}, time: ${time}, genre: ${genre}. Preparing data for client.`);
   try {
-    // Basic validation for genre if it's not null
     if (genre && !["Korku", "Macera", "Romantik", "Bilim Kurgu", "Fabl", "Felsefi"].includes(genre)) {
         console.error("[Action] saveWeeklyScheduleSlotAction: Invalid genre provided:", genre);
         return { success: false, error: "Geçersiz tür." };
     }
-    // This action prepares data. Client will use dbUpsertWeeklySchedule or dbDeleteWeeklyScheduleByDayTime.
     const slotToSave = { dayOfWeek, time, genre };
     console.log("[Action] saveWeeklyScheduleSlotAction: Prepared data for client:", slotToSave);
     return { success: true, slotToSave };
   } catch (e) {
     const error = e instanceof Error ? e.message : "Haftalık plan kaydedilirken bir sunucu hatası oluştu.";
-    console.error("[Action] saveWeeklyScheduleSlotAction: Error:", error);
+    console.error("[Action] saveWeeklyScheduleSlotAction: Error on server:", error);
     return { success: false, error };
   }
 }

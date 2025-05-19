@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -5,12 +6,12 @@ import { usePathname } from 'next/navigation';
 import { Menu, X, BookOpen, Home, LayoutGrid } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger, SheetClose } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from '@/components/ui/sheet';
 import { Logo } from '@/components/site/Logo';
 import { cn } from '@/lib/utils';
 import { GENRES, APP_NAME } from '@/lib/constants';
 
-const defaultCategory = GENRES[0] || "Adventure"; // Default category for the link
+const defaultCategory = GENRES[0] || "Macera"; // Default category for the link
 
 const navLinks = [
   { href: '/', label: 'Anasayfa', icon: Home },
@@ -69,7 +70,7 @@ export function Header() {
     )}>
       <div className="container mx-auto flex h-20 items-center justify-between px-4 md:px-6">
         <Link href="/" aria-label={`${APP_NAME} Anasayfa`}>
-          <Logo className="h-10 w-auto" />
+          <Logo className="h-9 w-auto" />
         </Link>
 
         {/* Desktop Navigation */}
@@ -103,19 +104,21 @@ export function Header() {
                 <span className="sr-only">Menüyü aç</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-full max-w-xs bg-background p-6 shadow-xl">
-              <div className="flex justify-between items-center mb-6">
+            <SheetContent side="right" className="w-full max-w-xs bg-background p-0 shadow-xl flex flex-col">
+              <SheetHeader className="p-6 flex flex-row justify-between items-center border-b">
                 <Link href="/" onClick={() => setIsMobileMenuOpen(false)}>
                   <Logo className="h-8 w-auto" />
                 </Link>
+                <SheetTitle className="sr-only">Ana Menü</SheetTitle> 
+                {/* Title for accessibility, visually hidden if Logo acts as title. Or "Menü" */}
                 <SheetClose asChild>
                   <Button variant="ghost" size="icon">
                     <X className="h-6 w-6" />
                     <span className="sr-only">Menüyü kapat</span>
                   </Button>
                 </SheetClose>
-              </div>
-              <nav className="flex flex-col space-y-3">
+              </SheetHeader>
+              <nav className="flex flex-col space-y-3 p-6 flex-grow overflow-y-auto">
                 {navLinks.map((link) => (
                   <div key={link.href}>
                     <NavLinkItem href={link.href} label={link.label} icon={link.icon} exact={link.href === '/'} />

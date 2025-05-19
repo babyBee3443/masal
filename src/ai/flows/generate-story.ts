@@ -28,12 +28,13 @@ const StoryTextOutputSchema = z.object({
 type StoryTextOutput = z.infer<typeof StoryTextOutputSchema>;
 
 // Schema for the final output of the flow, including the image URL
-export const GenerateStoryOutputSchema = z.object({
+// NOT EXPORTED as a const value from 'use server' file
+const GenerateStoryOutputSchema = z.object({
   title: z.string().describe("Üretilen hikayenin başlığı."),
   content: z.string().describe("Üretilen hikayenin tam metin içeriği."),
   imageUrl: z.string().describe("Üretilen görseli içeren bir data URI. Beklenen format: 'data:<mimetype>;base64,<encoded_data>'"),
 });
-export type GenerateStoryOutput = z.infer<typeof GenerateStoryOutputSchema>;
+export type GenerateStoryOutput = z.infer<typeof GenerateStoryOutputSchema>; // Type export is fine
 
 // This is the only function that should be exported for use by server actions or components.
 export async function generateStory(input: GenerateStoryInput): Promise<GenerateStoryOutput> {
@@ -43,7 +44,7 @@ export async function generateStory(input: GenerateStoryInput): Promise<Generate
 const generateStoryPrompt = ai.definePrompt({
   name: 'generateStoryPrompt',
   input: {schema: GenerateStoryInputSchema},
-  output: {schema: StoryTextOutputSchema}, 
+  output: {schema: StoryTextOutputSchema},
   prompt: `Yaratıcı bir hikaye yazarısın. Aşağıdaki türde bir hikaye yaz: {{{genre}}}.
 
 Bu hikayeyi Türkçe bir masal formatında oluşturmalısın. Masal yazarken aşağıdaki kurallara ve aşamalara uymalısın:
@@ -124,3 +125,4 @@ const generateStoryFlow = ai.defineFlow(
     };
   }
 );
+

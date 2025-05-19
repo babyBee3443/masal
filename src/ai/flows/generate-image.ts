@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -16,10 +17,11 @@ const RegenerateAIImageInputSchema = z.object({
 });
 export type RegenerateAIImageInput = z.infer<typeof RegenerateAIImageInputSchema>;
 
+// NOT EXPORTED as a const value from 'use server' file
 const RegenerateAIImageOutputSchema = z.object({
   imageUrl: z.string().describe('Yeni oluşturulan görselin data URIsi.'),
 });
-export type RegenerateAIImageOutput = z.infer<typeof RegenerateAIImageOutputSchema>;
+export type RegenerateAIImageOutput = z.infer<typeof RegenerateAIImageOutputSchema>; // Type export is fine
 
 export async function regenerateAIImage(input: RegenerateAIImageInput): Promise<RegenerateAIImageOutput> {
   return regenerateAIImageFlow(input);

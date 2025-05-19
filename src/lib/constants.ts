@@ -2,7 +2,7 @@ import type { StoryGenre } from './types';
 
 export const GENRES: StoryGenre[] = ["Korku", "Macera", "Romantik", "Bilim Kurgu", "Fabl", "Felsefi"];
 
-export const APP_NAME = "Masal Dünyası";
+export const APP_NAME = "DüşBox"; // Bu satırın "DüşBox" olduğundan emin olun!
 
 export const STORY_LENGTHS = [
   { value: "kısa", label: "Kısa" },

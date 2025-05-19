@@ -150,5 +150,3 @@ function LoadingStories() {
     </div>
   );
 }
-
-    

@@ -40,14 +40,14 @@ export async function sendApprovalEmail(storyId: string, storyTitle: string, sto
   const adminPanelUrl = `${appBaseUrl}/admin`;
 
   const mailOptions: MailOptions = {
-    from: `"Masal Dünyası Bildirimleri" <${mailUser}>`, // Sender address
+    from: `"DüşBox Bildirimleri" <${mailUser}>`, // Sender address
     to: mailTo, // List of receivers
     subject: `Yeni Masal Onay Bekliyor: ${storyTitle}`, // Subject line
     html: `
       <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px;">
         <h1 style="color: #4A5568; text-align: center;">Yeni Bir Masal Onayınızı Bekliyor!</h1>
         <p>Merhaba,</p>
-        <p>"Masal Dünyası" için yeni bir hikaye üretildi ve onayınızı bekliyor:</p>
+        <p>"DüşBox" için yeni bir hikaye üretildi ve onayınızı bekliyor:</p>
         <br>
         <p><strong>Başlık:</strong> ${storyTitle}</p>
         <p><strong>İçerik (Önizleme):</strong></p>
@@ -80,7 +80,7 @@ export async function sendApprovalEmail(storyId: string, storyTitle: string, sto
         <p style="font-size: 0.9em; color: #718096; text-align: center;"><em>(E-postadan yapılan onay/reddetme işlemleri doğrudan uygulanır. Detaylı düzenleme için lütfen yönetici panelini kullanın.)</em></p>
         <br>
         <p>Teşekkürler,</p>
-        <p>Masal Dünyası Ekibi</p>
+        <p>DüşBox Ekibi</p>
         <br>
         <p style="font-size: 0.8em; color: #a0aec0; text-align: center;"><em>(Bu e-posta otomatik olarak gönderilmiştir. Lütfen bu adrese yanıt vermeyiniz.)</em></p>
       </div>

@@ -1,3 +1,4 @@
+
 export type StoryGenre = "Korku" | "Macera" | "Romantik" | "Bilim Kurgu" | "Fabl" | "Felsefi";
 
 export interface Story {
@@ -7,7 +8,7 @@ export interface Story {
   summary: string;
   imageUrl: string;
   genre: StoryGenre;
-  status: 'pending' | 'published';
+  status: 'awaiting_approval' | 'pending' | 'published'; // Added 'awaiting_approval'
   createdAt: string; // ISO date string
   publishedAt?: string; // ISO date string
   scheduledAtDate?: string; // YYYY-MM-DD for publication scheduling
@@ -38,3 +39,4 @@ export interface WeeklyScheduleItem {
   createdAt: string; // ISO date string
   updatedAt: string; // ISO date string
 }
+

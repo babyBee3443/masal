@@ -53,7 +53,7 @@ const initialStoriesData: Story[] = [
     summary: '',
     imageUrl: 'https://placehold.co/600x480.png',
     genre: 'Korku',
-    status: 'pending',
+    status: 'awaiting_approval', // Changed to awaiting_approval for testing
     createdAt: new Date().toISOString(),
   }
 ].map(story => ({ ...story, summary: generateSummary(story.content) }));
@@ -87,6 +87,7 @@ const saveToLocalStorage = <T>(key: string, value: T): void => {
 export const getStories = async (): Promise<Story[]> => {
   const stories = getFromLocalStorage<Story[]>(STORIES_KEY, initialStoriesData);
   if (stories === initialStoriesData && stories.length > 0 && typeof window !== 'undefined' && !window.localStorage.getItem(STORIES_KEY)) {
+      // Initialize localStorage if it's empty and we have initial data
       saveToLocalStorage(STORIES_KEY, initialStoriesData);
   }
   return JSON.parse(JSON.stringify(stories));
@@ -98,16 +99,21 @@ export const getStoryById = async (id: string): Promise<Story | undefined> => {
   return story ? JSON.parse(JSON.stringify(story)) : undefined;
 };
 
-export const addStory = async (storyData: Omit<Story, 'id' | 'summary' | 'createdAt'>): Promise<Story> => {
+export const addStory = async (storyData: Omit<Story, 'id' | 'summary' | 'createdAt' | 'status'> & { status?: Story['status'] }): Promise<Story> => {
   let stories = getFromLocalStorage<Story[]>(STORIES_KEY, []);
   const newStory: Story = {
-    ...storyData,
+    title: storyData.title,
+    content: storyData.content,
+    imageUrl: storyData.imageUrl,
+    genre: storyData.genre,
     id: String(Date.now() + Math.random()),
     summary: generateSummary(storyData.content),
     createdAt: new Date().toISOString(),
+    status: storyData.status || 'awaiting_approval', // Default to awaiting_approval
   };
   stories.unshift(newStory);
   saveToLocalStorage(STORIES_KEY, stories);
+  console.log('[DB AddStory] Added story:', newStory.id, 'Status:', newStory.status);
   return JSON.parse(JSON.stringify(newStory));
 };
 
@@ -115,6 +121,7 @@ export const updateStory = async (id: string, updates: Partial<Omit<Story, 'id'>
   let stories = getFromLocalStorage<Story[]>(STORIES_KEY, []);
   const storyIndex = stories.findIndex(s => s.id === id);
   if (storyIndex === -1) {
+    console.error('[DB UpdateStory] Story not found:', id);
     return undefined;
   }
   const originalStory = stories[storyIndex];
@@ -123,6 +130,7 @@ export const updateStory = async (id: string, updates: Partial<Omit<Story, 'id'>
     stories[storyIndex].summary = generateSummary(updates.content);
   }
   saveToLocalStorage(STORIES_KEY, stories);
+  console.log('[DB UpdateStory] Updated story:', id, 'New Status:', stories[storyIndex].status, 'Updates:', updates);
   return JSON.parse(JSON.stringify(stories[storyIndex]));
 };
 
@@ -137,20 +145,33 @@ export const deleteStoryById = async (id: string): Promise<boolean> => {
 // Scheduled Generations
 const sortScheduledGenerations = (items: ScheduledGeneration[]): ScheduledGeneration[] => {
   return [...items].sort((a, b) => {
+    // Handle cases where scheduledDate or scheduledTime might be undefined or invalid
+    const aDateValid = a.scheduledDate && a.scheduledTime;
+    const bDateValid = b.scheduledDate && b.scheduledTime;
+
+    if (!aDateValid && !bDateValid) return 0;
+    if (!aDateValid) return 1; // Sort items without valid dates to the end
+    if (!bDateValid) return -1; // Sort items without valid dates to the end
+
     try {
       const dateA = parseISO(`${a.scheduledDate}T${a.scheduledTime}`);
       const dateB = parseISO(`${b.scheduledDate}T${b.scheduledTime}`);
-      if (!isValid(dateA) || !isValid(dateB)) return 0;
+      if (!isValid(dateA) && !isValid(dateB)) return 0;
+      if (!isValid(dateA)) return 1;
+      if (!isValid(dateB)) return -1;
       return dateA.getTime() - dateB.getTime();
     } catch (e) {
+      console.error("Error sorting scheduled generations:", e);
       return 0;
     }
   });
 };
 
+
 export const getScheduledGenerations = async (): Promise<ScheduledGeneration[]> => {
   let items = getFromLocalStorage<ScheduledGeneration[]>(SCHEDULED_GENERATIONS_KEY, []);
   if (typeof window !== 'undefined' && window.localStorage.getItem(SCHEDULED_GENERATIONS_KEY) === null) {
+    // Ensure localStorage is initialized if it was never set.
     saveToLocalStorage(SCHEDULED_GENERATIONS_KEY, []);
     items = []; 
   }
@@ -168,8 +189,9 @@ export const addScheduledGeneration = async (
     createdAt: new Date().toISOString(),
   };
   items.push(newScheduledGeneration);
-  saveToLocalStorage(SCHEDULED_GENERATIONS_KEY, items);
+  saveToLocalStorage(SCHEDULED_GENERATIONS_KEY, items); // Save the updated array
   
+  // Fetch all items again from localStorage to ensure sorted and complete list is returned
   const allCurrentItems = getFromLocalStorage<ScheduledGeneration[]>(SCHEDULED_GENERATIONS_KEY, []);
   return { 
     newScheduledGeneration: JSON.parse(JSON.stringify(newScheduledGeneration)), 
@@ -191,6 +213,7 @@ export const updateScheduledGenerationStatus = async (id: string, status: Schedu
     delete items[index].errorMessage;
   }
   saveToLocalStorage(SCHEDULED_GENERATIONS_KEY, items);
+  console.log('[DB UpdateScheduledGen] Updated:', id, 'Status:', status, 'StoryID:', generatedStoryId, 'Error:', errorMessage);
   return JSON.parse(JSON.stringify(items[index]));
 };
 
@@ -203,6 +226,8 @@ export const deleteScheduledGenerationById = async (id: string): Promise<boolean
 };
 
 export const getScheduledGenerationById = async (id: string): Promise<ScheduledGeneration | undefined> => {
+  console.warn("dbGetScheduledGenerationById is likely called from server action, which cannot access localStorage. This will return undefined on server.");
+  if (typeof window === 'undefined') return undefined; // Cannot access localStorage on server
   const items = getFromLocalStorage<ScheduledGeneration[]>(SCHEDULED_GENERATIONS_KEY, []);
   const scheduledItem = items.find(s => s.id === id);
   return scheduledItem ? JSON.parse(JSON.stringify(scheduledItem)) : undefined;
@@ -212,35 +237,36 @@ export const getScheduledGenerationById = async (id: string): Promise<ScheduledG
 export const getWeeklySchedules = async (): Promise<WeeklyScheduleItem[]> => {
   const items = getFromLocalStorage<WeeklyScheduleItem[]>(WEEKLY_SCHEDULES_KEY, []);
    if(items.length === 0 && typeof window !== 'undefined' && !window.localStorage.getItem(WEEKLY_SCHEDULES_KEY)) {
-    saveToLocalStorage(WEEKLY_SCHEDULES_KEY, []);
+    saveToLocalStorage(WEEKLY_SCHEDULES_KEY, []); // Initialize if not set
   }
   return JSON.parse(JSON.stringify(items));
 };
 
-export const upsertWeeklySchedule = async (item: Omit<WeeklyScheduleItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<WeeklyScheduleItem> => {
+export const upsertWeeklySchedule = async (itemData: Omit<WeeklyScheduleItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<WeeklyScheduleItem> => {
   let items = getFromLocalStorage<WeeklyScheduleItem[]>(WEEKLY_SCHEDULES_KEY, []);
-  const existingItemIndex = items.findIndex(ws => ws.dayOfWeek === item.dayOfWeek && ws.time === item.time);
+  const existingItemIndex = items.findIndex(ws => ws.dayOfWeek === itemData.dayOfWeek && ws.time === itemData.time);
   const now = new Date().toISOString();
 
+  let savedItem: WeeklyScheduleItem;
   if (existingItemIndex > -1) {
     items[existingItemIndex] = {
       ...items[existingItemIndex],
-      genre: item.genre,
+      genre: itemData.genre,
       updatedAt: now,
     };
-    saveToLocalStorage(WEEKLY_SCHEDULES_KEY, items);
-    return JSON.parse(JSON.stringify(items[existingItemIndex]));
+    savedItem = items[existingItemIndex];
   } else {
     const newItem: WeeklyScheduleItem = {
-      ...item,
+      ...itemData,
       id: `ws-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       createdAt: now,
       updatedAt: now,
     };
     items.push(newItem);
-    saveToLocalStorage(WEEKLY_SCHEDULES_KEY, items);
-    return JSON.parse(JSON.stringify(newItem));
+    savedItem = newItem;
   }
+  saveToLocalStorage(WEEKLY_SCHEDULES_KEY, items);
+  return JSON.parse(JSON.stringify(savedItem));
 };
 
 export const deleteWeeklyScheduleByDayTime = async (dayOfWeek: DayOfWeek, time: string): Promise<boolean> => {

@@ -19,9 +19,11 @@ import {
     deleteStoryAction, 
     updateStoryCategoryAction, 
     regenerateStoryImageAction, 
-    scheduleStoryPublicationAction 
+    scheduleStoryPublicationAction,
+    approveStoryAction 
 } from '@/lib/actions';
-import { CheckCircle, Trash2, RefreshCw, Loader2, CalendarClock, Edit3 } from 'lucide-react'; // Changed Edit to Edit3
+import { updateStory as dbUpdateStory, deleteStoryById as dbDeleteStoryById } from '@/lib/mock-db'; // Import db functions
+import { CheckCircle, Trash2, RefreshCw, Loader2, CalendarClock, Edit3, ShieldCheck } from 'lucide-react';
 import { format, parseISO, isValid } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import {
@@ -50,12 +52,12 @@ import { Label } from '@/components/ui/label';
 
 interface AdminStoryControlsProps {
   story: Story;
-  onStoryUpdate: () => void; // Callback to inform parent to refresh list
+  onStoryUpdate: () => void; 
 }
 
 export function AdminStoryControls({ story: initialStory, onStoryUpdate }: AdminStoryControlsProps) {
   const [story, setStory] = useState(initialStory);
-  const [isProcessing, startTransition] = useTransition(); // Renamed for clarity
+  const [isProcessing, startTransition] = useTransition();
   const { toast } = useToast();
 
   const [isSchedulingDialogOpen, setIsSchedulingDialogOpen] = useState(false);
@@ -75,44 +77,57 @@ export function AdminStoryControls({ story: initialStory, onStoryUpdate }: Admin
     setScheduledTime(initialStory.scheduledAtTime || "10:00");
     setEditableTitle(initialStory.title);
     setEditableContent(initialStory.content);
-    setIsEditing(false); // Reset editing state when story prop changes
+    setIsEditing(false); 
   }, [initialStory]);
 
+  const handleApprove = () => {
+    startTransition(async () => {
+        const actionResult = await approveStoryAction(story.id);
+        if (actionResult.success && actionResult.storyDataToUpdate) {
+            await dbUpdateStory(story.id, actionResult.storyDataToUpdate);
+            toast({ title: 'Hikaye Onaylandı', description: `"${story.title}" onaylandı ve bekleyenler listesine taşındı.`});
+            onStoryUpdate();
+        } else {
+            toast({ variant: 'destructive', title: 'Onaylama Hatası', description: actionResult.error });
+        }
+    });
+  };
 
   const handlePublish = () => {
     startTransition(async () => {
-      const result = await publishStoryAction(story.id);
-      if (result.success && result.story) {
-        // setStory(result.story); // Parent will update via onStoryUpdate
-        toast({ title: 'Hikaye Yayınlandı', description: `"${result.story.title}" artık yayında.` });
+      const actionResult = await publishStoryAction(story.id);
+      if (actionResult.success && actionResult.storyDataToUpdate) {
+        await dbUpdateStory(story.id, actionResult.storyDataToUpdate);
+        toast({ title: 'Hikaye Yayınlandı', description: `"${story.title}" artık yayında.` });
         onStoryUpdate(); 
       } else {
-        toast({ variant: 'destructive', title: 'Yayınlama Hatası', description: result.error });
+        toast({ variant: 'destructive', title: 'Yayınlama Hatası', description: actionResult.error });
       }
     });
   };
 
   const handleDelete = () => {
     startTransition(async () => {
-      const result = await deleteStoryAction(story.id);
-      if (result.success) {
+      const actionResult = await deleteStoryAction(story.id);
+      if (actionResult.success && actionResult.storyIdToDelete) {
+        await dbDeleteStoryById(actionResult.storyIdToDelete);
         toast({ title: 'Hikaye Silindi', description: `"${story.title}" silindi.` });
         onStoryUpdate(); 
       } else {
-        toast({ variant: 'destructive', title: 'Silme Hatası', description: result.error });
+        toast({ variant: 'destructive', title: 'Silme Hatası', description: actionResult.error });
       }
     });
   };
 
   const handleCategoryChange = (newGenre: StoryGenre) => {
     startTransition(async () => {
-      const result = await updateStoryCategoryAction(story.id, newGenre);
-      if (result.success && result.story) {
-        // setStory(result.story);
-        toast({ title: 'Kategori Güncellendi', description: `"${result.story.title}" hikayesinin kategorisi ${newGenre} olarak değiştirildi.` });
+      const actionResult = await updateStoryCategoryAction(story.id, newGenre);
+      if (actionResult.success && actionResult.storyDataToUpdate) {
+        await dbUpdateStory(story.id, actionResult.storyDataToUpdate);
+        toast({ title: 'Kategori Güncellendi', description: `"${story.title}" hikayesinin kategorisi ${newGenre} olarak değiştirildi.` });
         onStoryUpdate();
       } else {
-        toast({ variant: 'destructive', title: 'Kategori Güncelleme Hatası', description: result.error });
+        toast({ variant: 'destructive', title: 'Kategori Güncelleme Hatası', description: actionResult.error });
       }
     });
   };
@@ -120,13 +135,13 @@ export function AdminStoryControls({ story: initialStory, onStoryUpdate }: Admin
   const handleRegenerateImage = () => {
     startTransition(async () => {
       toast({title: "Görsel Oluşturuluyor", description: "Yapay zeka yeni bir görsel hazırlıyor..."});
-      const result = await regenerateStoryImageAction(story.id, story.content);
-      if (result.success && result.imageUrl) {
-        // setStory(prev => ({ ...prev, imageUrl: result.imageUrl! }));
+      const actionResult = await regenerateStoryImageAction(story.id, story.content);
+      if (actionResult.success && actionResult.imageUrl && actionResult.storyIdToUpdate) {
+        await dbUpdateStory(actionResult.storyIdToUpdate, { imageUrl: actionResult.imageUrl });
         toast({ title: 'Görsel Yeniden Oluşturuldu', description: `"${story.title}" için yeni görsel oluşturuldu.` });
         onStoryUpdate(); 
       } else {
-        toast({ variant: 'destructive', title: 'Görsel Yeniden Oluşturma Hatası', description: result.error });
+        toast({ variant: 'destructive', title: 'Görsel Yeniden Oluşturma Hatası', description: actionResult.error });
       }
     });
   };
@@ -138,41 +153,40 @@ export function AdminStoryControls({ story: initialStory, onStoryUpdate }: Admin
     }
     const dateString = format(scheduledDate, 'yyyy-MM-dd');
     startTransition(async () => {
-      const result = await scheduleStoryPublicationAction(story.id, dateString, scheduledTime);
-      if (result.success && result.story) {
-        // setStory(result.story);
-        toast({ title: 'Hikaye Zamanlandı', description: `"${result.story.title}" ${format(scheduledDate, 'dd MMMM yyyy', {locale: tr})} ${scheduledTime} için zamanlandı.`});
+      const actionResult = await scheduleStoryPublicationAction(story.id, dateString, scheduledTime);
+      if (actionResult.success && actionResult.storyDataToUpdate) {
+        await dbUpdateStory(story.id, actionResult.storyDataToUpdate);
+        toast({ title: 'Hikaye Zamanlandı', description: `"${story.title}" ${format(scheduledDate, 'dd MMMM yyyy', {locale: tr})} ${scheduledTime} için zamanlandı.`});
         setIsSchedulingDialogOpen(false);
         onStoryUpdate();
       } else {
-        toast({ variant: 'destructive', title: 'Zamanlama Hatası', description: result.error });
+        toast({ variant: 'destructive', title: 'Zamanlama Hatası', description: actionResult.error });
       }
     });
   };
   
   const handleSaveEdits = () => {
     startTransition(async () => {
-        // In a real app, this would call an action like updateStoryDetailsAction
-        // For now, we simulate by calling onStoryUpdate which should refetch from localStorage
-        // where the story content would have been "updated" by direct state change if using a library like Zustand
-        // With direct localStorage, we need an action that calls dbUpdateStory
-        // Let's assume an action `updateStoryDetailsAction(storyId, { title, content })` exists or add it
-        // For now, let's try to make this work with existing onStoryUpdate, assuming it refetches
-        // This is a temporary solution until a proper update action is implemented.
-        // This won't actually save to localStorage without an action.
-        // We need to call an action to update the story in mock-db.ts (localStorage)
-        const { updateStory } = await import('@/lib/mock-db'); // Dynamically import to use client-side
-        const updatedStory = await updateStory(story.id, { title: editableTitle, content: editableContent });
-
+        const updatedStory = await dbUpdateStory(story.id, { title: editableTitle, content: editableContent });
         if (updatedStory) {
             toast({ title: "Hikaye Güncellendi", description: `"${updatedStory.title}" başarıyla güncellendi.`});
             setIsEditing(false);
-            onStoryUpdate(); // This will trigger re-fetch from localStorage
+            onStoryUpdate(); 
         } else {
             toast({ variant: "destructive", title: "Güncelleme Başarısız", description: "Hikaye güncellenemedi."});
         }
     });
   };
+
+  const getStatusTextAndColor = () => {
+    switch(story.status) {
+        case 'awaiting_approval': return { text: 'Onay Bekliyor', color: 'text-orange-500' };
+        case 'pending': return { text: 'Beklemede', color: 'text-blue-500' };
+        case 'published': return { text: 'Yayınlandı', color: 'text-green-600' };
+        default: return { text: story.status, color: 'text-gray-500'};
+    }
+  };
+  const statusInfo = getStatusTextAndColor();
 
 
   const formatDateDisplay = (dateString?: string, timeString?: string) => {
@@ -198,25 +212,25 @@ export function AdminStoryControls({ story: initialStory, onStoryUpdate }: Admin
     }
   }
   
-  const formatSimpleDate = (dateString?: string) => {
-    if (!dateString) return 'N/A';
+  const formatSimpleDate = (isoDateString?: string) => {
+    if (!isoDateString) return 'N/A';
     try {
-      if(!isValid(parseISO(dateString))) return 'Geçersiz Tarih Yapısı';
-      const date = parseISO(dateString);
-      return format(date, 'dd MMMM yyyy, HH:mm', {locale: tr});
+      const date = parseISO(isoDateString);
+      if(!isValid(date)) return 'Geçersiz Oluşturulma Tarihi';
+      return format(date, 'dd MMMM yyyy, HH:mm', { locale: tr });
     } catch (e) {
-       console.warn("AdminStoryControls - formatSimpleDate fallback parse for:", dateString, e);
+       console.warn("AdminStoryControls - formatSimpleDate fallback parse for:", isoDateString, e);
        try {
-           const parsedDate = new Date(dateString); // Fallback parsing
+           const parsedDate = new Date(isoDateString); 
            if(isValid(parsedDate)) {
             return format(parsedDate, 'dd MMMM yyyy, HH:mm', {locale: tr});
            }
-           return 'Hatalı Tarih';
+           return 'Hatalı Oluşturulma Tarihi';
        } catch (finalError) {
-            return 'Çok Hatalı Tarih';
+            return 'Çok Hatalı Oluşturulma Tarihi';
        }
     }
-  }
+  };
 
 
   return (
@@ -233,7 +247,7 @@ export function AdminStoryControls({ story: initialStory, onStoryUpdate }: Admin
             <CardTitle className="text-2xl">{story.title}</CardTitle>
         )}
         <CardDescription>
-          Durum: <span className={`font-semibold ${story.status === 'published' ? 'text-green-600' : 'text-orange-500'}`}>{story.status === 'published' ? 'Yayınlandı' : 'Beklemede'}</span>
+          Durum: <span className={`font-semibold ${statusInfo.color}`}>{statusInfo.text}</span>
           <span className="mx-2">|</span>
           Tür: {story.genre}
           <br />
@@ -255,7 +269,7 @@ export function AdminStoryControls({ story: initialStory, onStoryUpdate }: Admin
             height={480}
             className="rounded-lg object-cover w-full aspect-[4/3] shadow-md"
             data-ai-hint="story illustration fantasy"
-            key={story.imageUrl} // Add key to force re-render on image URL change
+            key={story.imageUrl} 
           />
           <Button onClick={handleRegenerateImage} disabled={isProcessing} className="w-full mt-4" variant="outline">
             {isProcessing && story.imageUrl !== initialStory.imageUrl ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
@@ -284,7 +298,11 @@ export function AdminStoryControls({ story: initialStory, onStoryUpdate }: Admin
           </div>
           <div>
             <Label htmlFor={`category-${story.id}`} className="text-sm font-medium text-muted-foreground block mb-1">Kategoriyi Değiştir</Label>
-            <Select value={story.genre} onValueChange={(value) => handleCategoryChange(value as StoryGenre)} disabled={isProcessing || isEditing}>
+            <Select 
+                value={story.genre} 
+                onValueChange={(value) => handleCategoryChange(value as StoryGenre)} 
+                disabled={isProcessing || isEditing || story.status === 'published'}
+            >
               <SelectTrigger id={`category-${story.id}`} className="w-full">
                 <SelectValue placeholder="Tür seçin" />
               </SelectTrigger>
@@ -307,17 +325,23 @@ export function AdminStoryControls({ story: initialStory, onStoryUpdate }: Admin
                 </Button>
             </div>
         ) : (
-             <Button onClick={() => setIsEditing(true)} variant="outline" disabled={isProcessing || story.status === 'published'}>
+             <Button onClick={() => setIsEditing(true)} variant="outline" disabled={isProcessing || story.status === 'published' || story.status === 'awaiting_approval'}>
                 <Edit3 className="mr-2 h-4 w-4" /> Düzenle
             </Button>
         )}
         </div>
 
         <div className="flex flex-wrap justify-end space-x-3 gap-y-2">
+            {story.status === 'awaiting_approval' && !isEditing && (
+                <Button onClick={handleApprove} disabled={isProcessing} className="bg-green-500 hover:bg-green-600 text-white">
+                    {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
+                    Onayla
+                </Button>
+            )}
             {story.status === 'pending' && !isEditing && (
             <>
                 <Button onClick={handlePublish} disabled={isProcessing} className="bg-green-600 hover:bg-green-700 text-white">
-                {isProcessing && story.status !== 'pending' && story.status === 'published' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+                {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
                 Şimdi Yayınla
                 </Button>
                 <Dialog open={isSchedulingDialogOpen} onOpenChange={setIsSchedulingDialogOpen}>
@@ -377,7 +401,7 @@ export function AdminStoryControls({ story: initialStory, onStoryUpdate }: Admin
                     <DialogFooter>
                     <DialogClose asChild><Button variant="outline">İptal</Button></DialogClose>
                     <Button onClick={handleSchedulePublication} disabled={isProcessing || !scheduledDate || !scheduledTime}>
-                        {isProcessing && story.scheduledAtDate ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                         Zamanla
                     </Button>
                     </DialogFooter>
@@ -389,7 +413,7 @@ export function AdminStoryControls({ story: initialStory, onStoryUpdate }: Admin
                  <AlertDialog>
                     <AlertDialogTrigger asChild>
                         <Button variant="destructive" disabled={isProcessing}>
-                        {isProcessing && !initialStory.status /* Check against initialStory as story might be optimistic update */ ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                        {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
                         Sil
                         </Button>
                     </AlertDialogTrigger>
@@ -401,8 +425,12 @@ export function AdminStoryControls({ story: initialStory, onStoryUpdate }: Admin
                         </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                        <AlertDialogCancel>İptal</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
+                        <AlertDialogCancel disabled={isProcessing}>İptal</AlertDialogCancel>
+                        <AlertDialogAction 
+                            onClick={handleDelete} 
+                            className="bg-destructive hover:bg-destructive/90"
+                            disabled={isProcessing}
+                        >
                             Evet, hikayeyi sil
                         </AlertDialogAction>
                         </AlertDialogFooter>
@@ -415,5 +443,3 @@ export function AdminStoryControls({ story: initialStory, onStoryUpdate }: Admin
     </Card>
   );
 }
-
-    

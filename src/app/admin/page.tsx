@@ -5,11 +5,11 @@
 import { useEffect, useState, useTransition } from 'react';
 import Link from 'next/link';
 import type { Story } from '@/lib/types';
-import { getStories, updateStory } from '@/lib/mock-db'; 
+import { getStories, updateStory as dbUpdateStory } from '@/lib/mock-db'; 
 import { AdminStoryControls } from '@/components/admin/AdminStoryControls';
 import { GenerateStorySection } from '@/components/admin/GenerateStorySection';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, AlertTriangle, Inbox, CalendarCog, Repeat, Info, CheckCircle } from 'lucide-react';
+import { Loader2, AlertTriangle, Inbox, CalendarCog, Repeat, Info, CheckCircle, ShieldQuestion } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -24,16 +24,20 @@ export default function AdminPage() {
   const [autoPublicationAttempted, setAutoPublicationAttempted] = useState(false);
 
   const fetchStories = async (isManualRefresh = false) => {
-    if(!isManualRefresh) setIsLoading(true);
+    if(!isManualRefresh && !isLoading) setIsLoading(true); // Show loading only if not already loading
     setError(null);
+    console.log('[AdminPage Fetch] Fetching stories. ManualRefresh:', isManualRefresh);
     try {
       let fetchedStories = await getStories();
+      console.log('[AdminPage Fetch] Fetched stories count:', fetchedStories.length);
       
       // Automatic Publication Check
       if (!autoPublicationAttempted || isManualRefresh) {
         const now = new Date();
         let publishedCount = 0;
-        const storiesToUpdatePromises = fetchedStories
+        const storiesToUpdatePromises: Promise<Story | undefined>[] = [];
+
+        fetchedStories
           .filter(story => 
             story.status === 'pending' && 
             story.scheduledAtDate && 
@@ -43,22 +47,24 @@ export default function AdminPage() {
             try {
               const scheduledDateTime = parseISO(`${story.scheduledAtDate}T${story.scheduledAtTime}`);
               return isValid(scheduledDateTime) && scheduledDateTime <= now;
-            } catch {
+            } catch(e) {
+              console.error('[AdminPage AutoPublish] Error parsing schedule for story:', story.id, e);
               return false;
             }
           })
-          .map(story => {
+          .forEach(story => {
             publishedCount++;
-            return updateStory(story.id, {
+            console.log('[AdminPage AutoPublish] Marking story for auto-publication:', story.id, story.title);
+            storiesToUpdatePromises.push(dbUpdateStory(story.id, {
               status: 'published',
               publishedAt: now.toISOString(),
-              scheduledAtDate: undefined, // Clear schedule
+              scheduledAtDate: undefined, 
               scheduledAtTime: undefined,
-            });
+            }));
           });
 
         if (storiesToUpdatePromises.length > 0) {
-          if (isManualRefresh) {
+          if (isManualRefresh || !autoPublicationAttempted) { // Show toast on manual refresh or first auto attempt
              toast({
                 title: "Otomatik Yayın Kontrolü",
                 description: `${storiesToUpdatePromises.length} adet zamanı gelmiş hikaye yayınlanıyor...`
@@ -66,7 +72,7 @@ export default function AdminPage() {
           }
           await Promise.all(storiesToUpdatePromises);
           fetchedStories = await getStories(); // Re-fetch after updates
-           if (publishedCount > 0 && isManualRefresh) { // Only show success toast on manual refresh to avoid spam
+           if (publishedCount > 0 && (isManualRefresh || !autoPublicationAttempted)) { 
             toast({
                 variant: "default",
                 title: "Hikayeler Otomatik Yayınlandı",
@@ -75,49 +81,67 @@ export default function AdminPage() {
             });
            }
         }
-        if (!autoPublicationAttempted) setAutoPublicationAttempted(true);
+        if (!autoPublicationAttempted) {
+            setAutoPublicationAttempted(true);
+            console.log('[AdminPage AutoPublish] Auto publication check complete on load.');
+        }
       }
 
-
       fetchedStories.sort((a, b) => {
-        if (a.status === 'pending' && b.status !== 'pending') return -1;
-        if (a.status !== 'pending' && b.status === 'pending') return 1;
+        // Sort by status: awaiting_approval -> pending -> published
+        const statusOrder = { 'awaiting_approval': 1, 'pending': 2, 'published': 3 };
+        if (statusOrder[a.status] !== statusOrder[b.status]) {
+          return statusOrder[a.status] - statusOrder[b.status];
+        }
         
+        // Within 'pending', sort by scheduledAtDate (earliest first)
         if (a.status === 'pending' && b.status === 'pending') {
           if (a.scheduledAtDate && b.scheduledAtDate) {
-            const dateA = new Date(`${a.scheduledAtDate}T${a.scheduledAtTime || '00:00'}`);
-            const dateB = new Date(`${b.scheduledAtDate}T${b.scheduledAtTime || '00:00'}`);
-            if (dateA.getTime() !== dateB.getTime()) {
-              return dateA.getTime() - dateB.getTime();
-            }
+            try {
+                const dateA = parseISO(`${a.scheduledAtDate}T${a.scheduledAtTime || '00:00'}`);
+                const dateB = parseISO(`${b.scheduledAtDate}T${b.scheduledAtTime || '00:00'}`);
+                if (isValid(dateA) && isValid(dateB) && dateA.getTime() !== dateB.getTime()) {
+                    return dateA.getTime() - dateB.getTime();
+                }
+            } catch (e) { /* ignore sort error for invalid dates */ }
           } else if (a.scheduledAtDate) {
             return -1; 
           } else if (b.scheduledAtDate) {
             return 1;  
           }
         }
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        // Default sort by createdAt (newest first)
+        try {
+            const dateA = parseISO(a.createdAt);
+            const dateB = parseISO(b.createdAt);
+            if(isValid(dateA) && isValid(dateB)) return dateB.getTime() - dateA.getTime();
+        } catch (e) { /* ignore sort error for invalid dates */ }
+        return 0;
       });
       setStories(fetchedStories);
+      console.log('[AdminPage Fetch] Stories set to state. Count:', fetchedStories.length);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Hikayeler yüklenemedi.');
-      console.error(e);
+      console.error('[AdminPage Fetch] Error fetching stories:', e);
     } finally {
-      if(!isManualRefresh) setIsLoading(false);
+      if(isLoading) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchStories(false); // Initial fetch and auto-publication check
+    console.log('[AdminPage UseEffect] Initial fetch triggered.');
+    fetchStories(false); 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleStoryGeneratedOrUpdated = () => {
+    console.log('[AdminPage Callback] Story generated or updated. Refreshing list.');
     startRefreshTransition(() => {
-      fetchStories(true); // Manual refresh implies re-checking publications too
+      fetchStories(true); 
     });
   };
   
+  const awaitingApprovalStories = stories.filter(s => s.status === 'awaiting_approval');
   const pendingStories = stories.filter(s => s.status === 'pending');
   const publishedStories = stories.filter(s => s.status === 'published');
 
@@ -203,16 +227,22 @@ export default function AdminPage() {
         <h2 className="text-2xl md:text-3xl font-semibold text-foreground tracking-tight">
             Hikaye Kuyruğu 
         </h2>
-        <Button onClick={() => startRefreshTransition(() => fetchStories(true))} variant="ghost" size="icon" className="ml-2" disabled={isRefreshing}>
-            <Loader2 className={`h-6 w-6 ${isRefreshing ? 'animate-spin' : ''}`} />
+        <Button onClick={() => startRefreshTransition(() => fetchStories(true))} variant="ghost" size="icon" className="ml-2" disabled={isRefreshing || isLoading}>
+            <Loader2 className={`h-6 w-6 ${isRefreshing || isLoading ? 'animate-spin' : ''}`} />
         </Button>
       </div>
 
-      <Tabs defaultValue="pending" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 md:w-1/2 mb-6">
+      <Tabs defaultValue="awaiting_approval" className="w-full">
+        <TabsList className="grid w-full grid-cols-3 md:w-auto mb-6">
+          <TabsTrigger value="awaiting_approval">
+            <ShieldQuestion className="mr-2 h-4 w-4 inline-block" /> Onay Bekleyen ({awaitingApprovalStories.length})
+          </TabsTrigger>
           <TabsTrigger value="pending">Bekleyen ({pendingStories.length})</TabsTrigger>
           <TabsTrigger value="published">Yayınlanmış ({publishedStories.length})</TabsTrigger>
         </TabsList>
+        <TabsContent value="awaiting_approval">
+          {renderStoryList(awaitingApprovalStories, "Onay Bekleyen")}
+        </TabsContent>
         <TabsContent value="pending">
           {renderStoryList(pendingStories, "Bekleyen")}
         </TabsContent>
@@ -223,5 +253,3 @@ export default function AdminPage() {
     </div>
   );
 }
-
-    

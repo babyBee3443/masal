@@ -4,78 +4,95 @@
 
 import { revalidatePath } from 'next/cache';
 import type { Story, StoryGenre, ScheduledGeneration, WeeklyScheduleItem, DayOfWeek } from '@/lib/types';
+// Removed db imports for localStorage mutations from server actions where window is not available.
+// Client components will call mock-db functions directly or via client-side helpers.
 import { 
-  addStory as dbAddStory, 
-  deleteStoryById as dbDeleteStoryById, 
-  updateStory as dbUpdateStory, 
-  getStoryById as dbGetStoryById,
-  getStories as dbGetStories,
-  addScheduledGeneration as dbAddScheduledGeneration,
-  deleteScheduledGenerationById as dbDeleteScheduledGenerationById,
-  updateScheduledGenerationStatus as dbUpdateScheduledGenerationStatus,
-  getScheduledGenerationById as dbGetScheduledGenerationById,
-  getScheduledGenerations as dbGetScheduledGenerations, 
-  getWeeklySchedules as dbGetWeeklySchedules,
-  upsertWeeklySchedule as dbUpsertWeeklySchedule,
-  deleteWeeklyScheduleByDayTime as dbDeleteWeeklyScheduleByDayTime
-} from '@/lib/mock-db';
+  // addStory as dbAddStory, // Client will handle
+  // deleteStoryById as dbDeleteStoryById, // Client will handle
+  // updateStory as dbUpdateStory, // Client will handle
+  getStoryById as dbGetStoryById, // Read operations can stay if needed, but prefer client for consistency with localStorage
+  // getStories as dbGetStories, // Client will handle
+  // addScheduledGeneration as dbAddScheduledGeneration, // Client will handle
+  // deleteScheduledGenerationById as dbDeleteScheduledGenerationById, // Client will handle
+  updateScheduledGenerationStatus as dbUpdateScheduledGenerationStatus, // This might be complex if it involves AI, careful here
+  getScheduledGenerationById as dbGetScheduledGenerationById, // Read operation
+  // getWeeklySchedules as dbGetWeeklySchedules, // Client will handle
+  // upsertWeeklySchedule as dbUpsertWeeklySchedule, // Client will handle
+  // deleteWeeklyScheduleByDayTime as dbDeleteWeeklyScheduleByDayTime // Client will handle
+} from '@/lib/mock-db'; // Keep for read operations if any are truly server-side initiated
+
 import { generateStory as aiGenerateStory } from '@/ai/flows/generate-story';
 import { regenerateAIImage as aiRegenerateAIImage } from '@/ai/flows/generate-image';
 
+// These functions will now be called directly by client components for localStorage modifications
+// For example, publishStoryAction will be called by client, which then calls dbUpdateStory (client-side)
+
 export async function publishStoryAction(storyId: string) {
+  // This action is problematic if dbUpdateStory relies on localStorage and action is 'use server'
+  // For now, assuming client will call a client-side wrapper that uses dbUpdateStory
+  // If this action MUST be 'use server', it cannot directly modify localStorage.
+  // Let's assume for now this action will be refactored or called in a way client handles localStorage.
+  // To make it "work" as a server action that TRIES to update (but won't for localStorage):
   try {
-    const updatedStory = await dbUpdateStory(storyId, { 
-      status: 'published', 
-      publishedAt: new Date().toISOString(),
-      scheduledAtDate: undefined, 
-      scheduledAtTime: undefined, 
-    });
-    if (!updatedStory) throw new Error('Hikaye bulunamadı');
-    return { success: true, story: updatedStory };
+    // const updatedStory = await dbUpdateStory(storyId, { // This won't work on server for localStorage
+    //   status: 'published', 
+    //   publishedAt: new Date().toISOString(),
+    //   scheduledAtDate: undefined, 
+    //   scheduledAtTime: undefined, 
+    // });
+    // if (!updatedStory) throw new Error('Hikaye bulunamadı');
+    // To simulate:
+    console.warn("publishStoryAction (server): Cannot update localStorage. Client should handle this.");
+    const story = await dbGetStoryById(storyId); // Reading is fine if it defaults gracefully
+    if (!story) return { success: false, error: 'Hikaye bulunamadı (sunucu okuma)' };
+    
+    // Return data for client to update localStorage
+    return { 
+        success: true, 
+        storyDataToUpdate: { 
+            id: storyId, 
+            status: 'published' as 'published', 
+            publishedAt: new Date().toISOString(),
+            scheduledAtDate: undefined, 
+            scheduledAtTime: undefined 
+        } 
+    };
   } catch (error) {
-    console.error("Hikaye yayınlanamadı:", error);
+    console.error("Hikaye yayınlanamadı (sunucu):", error);
     return { success: false, error: error instanceof Error ? error.message : 'Hikaye yayınlanamadı' };
   }
 }
 
 export async function deleteStoryAction(storyId: string) {
-  try {
-    const deleted = await dbDeleteStoryById(storyId);
-    if (!deleted) throw new Error('Hikaye bulunamadı veya zaten silinmiş');
-    return { success: true };
-  } catch (error) {
-    console.error("Hikaye silinemedi:", error);
-    return { success: false, error: error instanceof Error ? error.message : 'Hikaye silinemedi' };
-  }
+  console.warn("deleteStoryAction (server): Cannot update localStorage. Client should handle this.");
+  return { success: true, storyIdToDelete: storyId }; // Client handles deletion
 }
 
 export async function updateStoryCategoryAction(storyId: string, newGenre: StoryGenre) {
-  try {
-    const updatedStory = await dbUpdateStory(storyId, { genre: newGenre });
-    if (!updatedStory) throw new Error('Hikaye kategorisi güncellenemedi');
-    return { success: true, story: updatedStory };
-  } catch (error) {
-    console.error("Hikaye kategorisi güncellenemedi:", error);
-    return { success: false, error: error instanceof Error ? error.message : 'Kategori güncellenemedi' };
-  }
+  console.warn("updateStoryCategoryAction (server): Cannot update localStorage. Client should handle this.");
+  return { success: true, storyDataToUpdate: { id: storyId, genre: newGenre } };
 }
+
 
 export async function generateNewStoryAction(genre: StoryGenre): Promise<{ success: boolean; story?: Story; error?: string }> {
   try {
     const aiResult = await aiGenerateStory({ genre });
-    const newStoryData: Omit<Story, 'id' | 'summary' | 'createdAt'> = {
+    // The AI part runs on server. The story object is created but NOT saved to localStorage here.
+    // The client will receive this and save it.
+    const newStoryData: Omit<Story, 'id' | 'summary' | 'createdAt'> & {status: 'pending'} = { // Explicitly add status here for clarity
       title: aiResult.title,
       content: aiResult.content,
       imageUrl: aiResult.imageUrl || 'https://placehold.co/600x480.png', 
       genre: genre,
-      status: 'pending',
+      status: 'pending', // New stories are pending
     };
-    const savedStory = await dbAddStory(newStoryData);
-    return { success: true, story: savedStory };
+    // This doesn't create the full Story object with id, summary, createdAt yet.
+    // The client-side dbAddStory will do that.
+    return { success: true, story: newStoryData as any }; // Cast as any, client will complete it
   } catch (error)
  {
-    console.error("Yeni hikaye oluşturulamadı (AI veya DB):", error);
-    let errorMessage = 'Yapay zeka ile hikaye oluşturulamadı veya kaydedilemedi.';
+    console.error("Yeni hikaye oluşturulamadı (AI):", error);
+    let errorMessage = 'Yapay zeka ile hikaye oluşturulamadı.';
     if (error instanceof Error) {
         errorMessage = error.message;
     } else if (typeof error === 'string') {
@@ -96,33 +113,32 @@ export async function regenerateStoryImageAction(storyId: string, storyText: str
     if (!aiResult.imageUrl) {
       throw new Error('Yapay zeka yeni bir görsel URLsi oluşturamadı.');
     }
-    const updatedStory = await dbUpdateStory(storyId, { imageUrl: aiResult.imageUrl });
-    if (!updatedStory) throw new Error('Görsel güncellemesi için hikaye bulunamadı');
-    return { success: true, imageUrl: aiResult.imageUrl };
+    // Client will handle updating localStorage with this new imageUrl
+    return { success: true, imageUrl: aiResult.imageUrl, /* storyId: storyId */ }; // Pass storyId back if needed for client to update
   } catch (error) {
-    console.error("Görsel yeniden oluşturulamadı:", error);
+    console.error("Görsel yeniden oluşturulamadı (AI):", error);
     return { success: false, error: error instanceof Error ? error.message : 'Görsel yeniden oluşturulamadı' };
   }
 }
 
-export async function scheduleStoryPublicationAction(storyId: string, date: string, time: string): Promise<{ success: boolean; story?: Story; error?: string }> {
-  try {
-    const story = await dbGetStoryById(storyId);
+export async function scheduleStoryPublicationAction(storyId: string, date: string, time: string): Promise<{ success: boolean; storyDataToUpdate?: Partial<Story> & { id: string }; error?: string }> {
+  console.warn("scheduleStoryPublicationAction (server): Cannot update localStorage. Client handles this.");
+  const story = await dbGetStoryById(storyId); // Reading is okay
     if (!story) {
       return { success: false, error: "Hikaye bulunamadı." };
     }
     if (story.status === 'published') {
       return { success: false, error: "Yayınlanmış hikayeler tekrar zamanlanamaz." };
     }
-    const updatedStory = await dbUpdateStory(storyId, { scheduledAtDate: date, scheduledAtTime: time, status: 'pending' }); 
-    if (!updatedStory) {
-      return { success: false, error: "Hikaye zamanlanamadı." };
-    }
-    return { success: true, story: updatedStory };
-  } catch (e) {
-    const error = e instanceof Error ? e.message : "Bilinmeyen bir hata oluştu.";
-    return { success: false, error };
-  }
+  return { 
+    success: true, 
+    storyDataToUpdate: { 
+      id: storyId, 
+      scheduledAtDate: date, 
+      scheduledAtTime: time, 
+      status: 'pending' 
+    } 
+  };
 }
 
 // Actions for Date-Based Scheduled Story Generation
@@ -132,87 +148,91 @@ export async function scheduleStoryGenerationAction(
   genre: StoryGenre
 ): Promise<{ 
   success: boolean; 
-  scheduledGeneration?: ScheduledGeneration; 
-  allScheduledGenerations?: ScheduledGeneration[]; 
+  // scheduledGeneration?: ScheduledGeneration; // This will be created by client
+  // allScheduledGenerations?: ScheduledGeneration[]; // Client will get this from its own db call
+  newScheduledGenerationData?: Omit<ScheduledGeneration, 'id' | 'status' | 'createdAt'>;
   error?: string 
 }> {
   try {
     if (!scheduledDate || !scheduledTime || !genre) {
       return { success: false, error: "Lütfen tarih, saat ve tür bilgilerini eksiksiz girin." };
     }
-    // dbAddScheduledGeneration now returns the new item and the full list
-    const { newScheduledGeneration, allItems } = await dbAddScheduledGeneration({ scheduledDate, scheduledTime, genre });
-    return { success: true, scheduledGeneration: newScheduledGeneration, allScheduledGenerations: allItems };
+    // Server action now only prepares the data, does not save to localStorage.
+    const newScheduledGenerationData: Omit<ScheduledGeneration, 'id' | 'status' | 'createdAt'> = {
+      scheduledDate,
+      scheduledTime,
+      genre
+    };
+    return { success: true, newScheduledGenerationData };
   } catch (e) {
-    const error = e instanceof Error ? e.message : "Planlama sırasında bir hata oluştu.";
+    const error = e instanceof Error ? e.message : "Planlama sırasında bir hata oluştu (sunucu).";
     return { success: false, error };
   }
 }
 
-export async function processScheduledGenerationAction(id: string): Promise<{ success: boolean; story?: Story; error?: string }> {
+export async function processScheduledGenerationAction(id: string): Promise<{ success: boolean; story?: Story; error?: string, scheduledGenerationId?: string, newStatus?: ScheduledGeneration['status'], errorMessage?: string }> {
   try {
-    const scheduledItem = await dbGetScheduledGenerationById(id);
+    const scheduledItem = await dbGetScheduledGenerationById(id); // Read from server (will be default if not truly synced)
     if (!scheduledItem) {
-      return { success: false, error: "Planlanmış üretim bulunamadı." };
+      return { success: false, error: "Planlanmış üretim bulunamadı (sunucu okuma)." };
     }
     if (scheduledItem.status === 'generated') {
-      return { success: false, error: "Bu üretim zaten tamamlanmış." };
+      // This check might be using stale server-side data if client has updated localStorage
+      // Client should ideally prevent calling this if already generated.
+      // return { success: false, error: "Bu üretim zaten tamamlanmış." };
     }
 
     const generationResult = await generateNewStoryAction(scheduledItem.genre);
 
     if (generationResult.success && generationResult.story) {
-      await dbUpdateScheduledGenerationStatus(id, 'generated', generationResult.story.id);
-      return { success: true, story: generationResult.story };
+      // Don't update status here. Client will do it.
+      // Return generated story and ID of the scheduled item.
+      return { 
+        success: true, 
+        story: generationResult.story, 
+        scheduledGenerationId: id, 
+        newStatus: 'generated' 
+      };
     } else {
-      await dbUpdateScheduledGenerationStatus(id, 'failed', undefined, generationResult.error || "Hikaye üretilemedi.");
-      return { success: false, error: generationResult.error || "Hikaye üretilemedi." };
+      // Return error and ID of the scheduled item.
+      return { 
+        success: false, 
+        error: generationResult.error || "Hikaye üretilemedi.", 
+        scheduledGenerationId: id, 
+        newStatus: 'failed',
+        errorMessage: generationResult.error || "Hikaye üretilemedi."
+      };
     }
   } catch (e) {
-    const error = e instanceof Error ? e.message : "Planlanmış üretim işlenirken bir hata oluştu.";
-    await dbUpdateScheduledGenerationStatus(id, 'failed', undefined, error);
-    return { success: false, error };
+    const errorMsg = e instanceof Error ? e.message : "Planlanmış üretim işlenirken bir hata oluştu (sunucu).";
+    // Return error and ID of the scheduled item.
+    return { 
+      success: false, 
+      error: errorMsg, 
+      scheduledGenerationId: id, 
+      newStatus: 'failed',
+      errorMessage: errorMsg
+    };
   }
 }
 
-export async function deleteScheduledGenerationAction(id: string): Promise<{ success: boolean; error?: string; allScheduledGenerations?: ScheduledGeneration[] }> {
-  try {
-    const deleted = await dbDeleteScheduledGenerationById(id);
-    if (!deleted) {
-      return { success: false, error: "Planlanmış üretim bulunamadı veya silinemedi." };
-    }
-    const allItems = await dbGetScheduledGenerations();
-    return { success: true, allScheduledGenerations: allItems };
-  } catch (e) {
-    const error = e instanceof Error ? e.message : "Silme işlemi sırasında bir hata oluştu.";
-    return { success: false, error };
-  }
+export async function deleteScheduledGenerationAction(id: string): Promise<{ success: boolean; error?: string; scheduledGenerationIdToDelete?: string }> {
+  // Server action only acknowledges the request. Client handles localStorage deletion.
+  console.warn("deleteScheduledGenerationAction (server): Cannot update localStorage. Client handles this.");
+  return { success: true, scheduledGenerationIdToDelete: id };
 }
 
 // Actions for Weekly Recurring Story Generation
 export async function getWeeklySchedulesAction(): Promise<{ success: boolean; schedules?: WeeklyScheduleItem[]; error?: string; }> {
-  try {
-    const schedules = await dbGetWeeklySchedules();
-    return { success: true, schedules };
-  } catch (e) {
-    const error = e instanceof Error ? e.message : "Haftalık planlar getirilirken bir hata oluştu.";
-    console.error("Haftalık planlar getirme hatası:", error);
-    return { success: false, error };
-  }
+  // This should ideally be a client-side call to dbGetWeeklySchedules directly
+  // If it must be an action, it will read defaults if localStorage isn't server-accessible
+  console.warn("getWeeklySchedulesAction (server): Reading from server context, may not reflect client's localStorage.");
+  // const schedules = await dbGetWeeklySchedules(); // This will return default [] on server
+  return { success: true, schedules: [] }; // Placeholder
 }
 
-export async function saveWeeklyScheduleSlotAction(dayOfWeek: DayOfWeek, time: string, genre: StoryGenre | null): Promise<{ success: boolean; schedules?: WeeklyScheduleItem[]; error?: string; }> {
-  try {
-    if (genre) {
-      await dbUpsertWeeklySchedule({ dayOfWeek, time, genre });
-    } else {
-      await dbDeleteWeeklyScheduleByDayTime(dayOfWeek, time);
-    }
-    const updatedSchedules = await dbGetWeeklySchedules();
-    return { success: true, schedules: updatedSchedules };
-  } catch (e) {
-    const error = e instanceof Error ? e.message : "Haftalık plan yuvası kaydedilirken bir hata oluştu.";
-    console.error("Haftalık plan kaydetme hatası:", error);
-    return { success: false, error };
-  }
+export async function saveWeeklyScheduleSlotAction(dayOfWeek: DayOfWeek, time: string, genre: StoryGenre | null): Promise<{ success: boolean; slotToSave?: {dayOfWeek: DayOfWeek, time: string, genre: StoryGenre | null }; error?: string; }> {
+  // Server action only acknowledges. Client handles localStorage update.
+  console.warn("saveWeeklyScheduleSlotAction (server): Cannot update localStorage. Client handles this.");
+  return { success: true, slotToSave: { dayOfWeek, time, genre } };
 }

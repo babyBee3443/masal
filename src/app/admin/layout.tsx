@@ -1,5 +1,6 @@
+
 import Link from 'next/link';
-import { ShieldCheck, Home, CalendarDays, Repeat } from 'lucide-react';
+import { ShieldCheck, Home, CalendarDays, Repeat, MailQuestion } from 'lucide-react'; // Added MailQuestion
 import { APP_NAME } from '@/lib/constants';
 import { Logo } from '@/components/site/Logo';
 import { Button } from '@/components/ui/button';
@@ -48,6 +49,14 @@ export default function AdminLayout({
                   <Link href="/admin/weekly-schedule">
                     <Repeat />
                     <span>Haftalık Planlama</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+               <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="E-posta İşlem Simülasyonu">
+                  <Link href="/admin/email-action">
+                    <MailQuestion />
+                    <span>E-posta Yanıtı</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

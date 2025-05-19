@@ -66,83 +66,111 @@ export default function WeeklySchedulePage() {
     if (showLoadingSpinner) setIsLoading(true);
     setError(null);
     try {
+      console.log("[WeeklyFetch] Fetching schedules from localStorage...");
       const fetchedSchedules = await dbGetWeeklySchedules();
       setSchedules(fetchedSchedules);
+      console.log(`[WeeklyFetch] Fetched ${fetchedSchedules.length} schedules.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Haftalık planlar yüklenemedi.');
       toast({ variant: 'destructive', title: 'Yükleme Hatası', description: e instanceof Error ? e.message : 'Haftalık planlar yüklenemedi.' });
+      console.error("[WeeklyFetch] Error fetching schedules:", e);
     } finally {
       if (showLoadingSpinner) setIsLoading(false);
     }
   };
 
-  const checkAndRunWeeklyGenerations = async () => {
-    if (isCheckingWeekly) return;
+  const checkAndRunWeeklyGenerations = async (isManualTrigger = false) => {
+    if (isCheckingWeekly && !isManualTrigger) {
+        console.log("[WeeklyGen] Already checking weekly generations, skipping.");
+        return;
+    }
     setIsCheckingWeekly(true);
-    toast({ title: "Haftalık Plan Kontrolü", description: "Otomatik üretimler kontrol ediliyor..."});
+    if(isManualTrigger) {
+        toast({ title: "Haftalık Plan Kontrolü Başlatıldı", description: "Otomatik üretimler manuel olarak kontrol ediliyor..."});
+    }
+    console.log("[WeeklyGen] Starting checkAndRunWeeklyGenerations. Manual:", isManualTrigger);
     
     let generatedCount = 0;
+    const now = new Date();
+    let ranMeaningfulCheck = false;
+
     try {
-        const now = new Date();
-        const currentDay = (now.getDay() + 6) % 7 as DayOfWeek; 
+        const currentDay = (now.getDay() + 6) % 7 as DayOfWeek; // 0 = Monday, ..., 6 = Sunday
         const currentTime = `${String(now.getHours()).padStart(2, '0')}:00`;
+        console.log(`[WeeklyGen] Current Day: ${currentDay}, Current Time: ${currentTime}`);
 
         const allSchedulesFromDb = await dbGetWeeklySchedules(); 
         const lastCheckTimeString = await getLastWeeklyCheckTime();
+        console.log(`[WeeklyGen] Last check time from localStorage: ${lastCheckTimeString}`);
         
         const oneHourInMs = 60 * 60 * 1000;
-        const oneHourAgo = new Date(now.getTime() - oneHourInMs).toISOString();
+        // const oneHourInMs = 1 * 60 * 1000; // For testing: 1 minute
+        const coolDownPeriodEnds = new Date(now.getTime() - oneHourInMs).toISOString();
 
-        if (lastCheckTimeString && new Date(lastCheckTimeString).getTime() > new Date(oneHourAgo).getTime()) {
-            console.log("Haftalık kontrol yakın zamanda yapılmış, atlanıyor. Son kontrol:", lastCheckTimeString);
-            toast({ title: "Haftalık Plan Kontrolü", description: "Kontrol yakın zamanda yapılmış, atlanıyor."});
+        if (!isManualTrigger && lastCheckTimeString && new Date(lastCheckTimeString).getTime() > new Date(coolDownPeriodEnds).getTime()) {
+            console.log(`[WeeklyGen] Cooldown active. Last check: ${lastCheckTimeString} is more recent than ${coolDownPeriodEnds}. Skipping.`);
+            if (!isManualTrigger) { // Only show toast for automatic checks
+                 toast({ title: "Haftalık Plan Kontrolü", description: "Otomatik kontrol yakın zamanda yapılmış, atlanıyor."});
+            }
             setIsCheckingWeekly(false);
             return;
         }
+        
+        ranMeaningfulCheck = true; // Cooldown passed or manual trigger
 
         const dueSchedules = allSchedulesFromDb.filter(
             (s) => s.dayOfWeek === currentDay && s.time === currentTime
         );
+        console.log(`[WeeklyGen] Found ${dueSchedules.length} due schedules for Day: ${currentDay}, Time: ${currentTime}.`);
 
         if (dueSchedules.length === 0) {
-            console.log("Şu an için zamanı gelmiş haftalık plan yok.");
-            toast({ title: "Haftalık Plan Kontrolü", description: "Şu an için zamanı gelmiş haftalık plan yok."});
+            if (isManualTrigger) { // Only show "no due" for manual trigger if cooldown passed
+                toast({ title: "Haftalık Plan Kontrolü", description: "Şu an için zamanı gelmiş haftalık plan yok."});
+            }
+            console.log("[WeeklyGen] No due weekly schedules at this time.");
         } else {
            toast({ title: "Haftalık Plan Kontrolü", description: `${dueSchedules.length} adet zamanı gelmiş plan bulundu, üretim başlatılıyor...`});
         }
 
         for (const schedule of dueSchedules) {
-            console.log(`[WeeklyGen] ${schedule.genre} türü için üretim deneniyor (Gün: ${schedule.dayOfWeek}, Saat: ${schedule.time})`);
+            console.log(`[WeeklyGen] Attempting generation for schedule ID: ${schedule.id}, Genre: ${schedule.genre}, Day: ${schedule.dayOfWeek}, Time: ${schedule.time}`);
             // Call generateNewStoryAction which is a server action for AI
             const result = await generateNewStoryAction(schedule.genre); 
+            console.log(`[WeeklyGen] Result for schedule ID ${schedule.id}: Success - ${result.success}, StoryData - ${!!result.storyData}, Error - ${result.error}`);
             if (result.success && result.storyData) {
                 // Add story to localStorage via mock-db
                 const newStory = await dbAddStory(result.storyData); 
                 generatedCount++;
                 toast({
                     variant: "default",
-                    title: "Haftalık Hikaye Üretildi!",
-                    description: `"${newStory.title}" (${schedule.genre}) planlandığı gibi başarıyla oluşturuldu ve admin kuyruğuna eklendi.`,
+                    title: "Haftalık Hikaye Başarıyla Üretildi!",
+                    description: `"${newStory.title}" (${schedule.genre}) adlı hikaye planlandığı gibi oluşturuldu ve admin panelindeki kuyruğa eklendi.`,
                     action: <CheckCircle className="text-green-500" />,
                 });
+                console.log(`[WeeklyGen] Successfully generated and added story: ${newStory.id} - "${newStory.title}"`);
             } else {
                 toast({
                     variant: "destructive",
-                    title: "Haftalık Üretim Başarısız",
-                    description: `${schedule.genre} türündeki hikaye üretilemedi: ${result.error || 'Bilinmeyen hata.'}`,
+                    title: "Haftalık Hikaye Üretimi Başarısız",
+                    description: `${schedule.genre} türündeki hikaye üretilemedi: ${result.error || 'Bilinmeyen bir hata oluştu.'}`,
                 });
-                 console.error(`[WeeklyGen] ${schedule.genre} üretimi başarısız: ${result.error}`);
+                 console.error(`[WeeklyGen] Failed to generate story for schedule ID ${schedule.id}. Error: ${result.error}`);
             }
         }
         
-        await setLastWeeklyCheckTime(now.toISOString());
-        console.log("Haftalık kontrol tamamlandı. Son kontrol zamanı güncellendi:", now.toISOString());
+        // Only update last check time if we passed the cooldown and actually checked for due schedules
+        if (ranMeaningfulCheck) {
+            await setLastWeeklyCheckTime(now.toISOString());
+            console.log(`[WeeklyGen] Meaningful check performed. Last check time updated to: ${now.toISOString()}`);
+        }
+
 
     } catch (e) {
-        console.error("Haftalık plan kontrolü/üretimi sırasında hata:", e);
-        toast({ variant: 'destructive', title: 'Haftalık Kontrol Hatası', description: e instanceof Error ? e.message : 'Bilinmeyen bir hata oluştu.' });
+        console.error("[WeeklyGen] Error during weekly generation check:", e);
+        toast({ variant: 'destructive', title: 'Haftalık Plan Kontrol Hatası', description: e instanceof Error ? e.message : 'Bilinmeyen bir hata oluştu.' });
     } finally {
         setIsCheckingWeekly(false);
+        console.log(`[WeeklyGen] Finished checkAndRunWeeklyGenerations. Generated ${generatedCount} stories.`);
         if (generatedCount > 0) {
             // Optionally, trigger a refresh of admin page or relevant story lists if needed
             // For now, admin page refresh will pick up new stories in "pending"
@@ -152,14 +180,26 @@ export default function WeeklySchedulePage() {
 
 
   useEffect(() => {
-    fetchSchedules();
-    checkAndRunWeeklyGenerations(); 
-    const intervalId = setInterval(checkAndRunWeeklyGenerations, 30 * 60 * 1000); 
-    return () => clearInterval(intervalId); 
+    fetchSchedules(); // Fetch initial schedules
+    checkAndRunWeeklyGenerations(false); // Initial check on load (not manual)
+    
+    const intervalDuration = 30 * 60 * 1000; // 30 minutes
+    // const intervalDuration = 2 * 60 * 1000; // For testing: 2 minutes
+    console.log(`[WeeklyGen] Setting up interval for checkAndRunWeeklyGenerations every ${intervalDuration / (60 * 1000)} minutes.`);
+    const intervalId = setInterval(() => {
+        console.log("[WeeklyGen] Interval triggered: Calling checkAndRunWeeklyGenerations.");
+        checkAndRunWeeklyGenerations(false); // Periodic check (not manual)
+    }, intervalDuration); 
+    
+    return () => {
+        console.log("[WeeklyGen] Clearing interval for checkAndRunWeeklyGenerations.");
+        clearInterval(intervalId);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleCellClick = (day: DayOfWeek, time: string) => {
+    console.log(`[WeeklyCellClick] Cell clicked: Day ${day}, Time ${time}`);
     const existingSchedule = schedules.find(s => s.dayOfWeek === day && s.time === time);
     setCurrentCell({ 
       day, 
@@ -169,57 +209,58 @@ export default function WeeklySchedulePage() {
     });
     setSelectedGenre(existingSchedule?.genre);
     setIsModalOpen(true);
+    console.log(`[WeeklyCellClick] Modal opening for:`, {day, time, genre: existingSchedule?.genre, id: existingSchedule?.id});
   };
 
   const handleSaveSlot = () => {
-    if (!currentCell) return;
+    if (!currentCell) {
+        console.error("[WeeklySave] Cannot save, currentCell is null.");
+        return;
+    }
     const { day, time } = currentCell;
-    const genreToSave = selectedGenre || null;
+    const genreToSave = selectedGenre || null; // If selectedGenre is undefined, treat as null (clear)
+    console.log(`[WeeklySave] Attempting to save slot: Day ${day}, Time ${time}, Genre ${genreToSave}`);
 
     startTransition(async () => {
-      // Call server action to validate/prepare data
       const actionResult = await saveWeeklyScheduleSlotAction(day, time, genreToSave);
+      console.log(`[WeeklySave] Server action result:`, actionResult);
       
       if (actionResult.success && actionResult.slotToSave) {
-        // Use mock-db to update localStorage
-        if (actionResult.slotToSave.genre) {
+        if (actionResult.slotToSave.genre) { // Genre is being set or updated
             await dbUpsertWeeklySchedule({ 
                 dayOfWeek: actionResult.slotToSave.dayOfWeek, 
                 time: actionResult.slotToSave.time, 
                 genre: actionResult.slotToSave.genre 
             });
-        } else {
+            console.log(`[WeeklySave] Upserted schedule to localStorage:`, actionResult.slotToSave);
+        } else { // Genre is null, so delete the schedule
             await dbDeleteWeeklyScheduleByDayTime(actionResult.slotToSave.dayOfWeek, actionResult.slotToSave.time);
+            console.log(`[WeeklySave] Deleted schedule from localStorage for Day ${actionResult.slotToSave.dayOfWeek}, Time ${actionResult.slotToSave.time}`);
         }
         
-        toast({ title: 'Plan Güncellendi', description: `${DAYS_OF_WEEK.find(d=>d.value === day)?.name} ${time} için plan ${genreToSave ? genreToSave + ' olarak ayarlandı.' : 'temizlendi.'}` });
+        toast({ title: 'Haftalık Plan Güncellendi', description: `${DAYS_OF_WEEK.find(d=>d.value === day)?.name} ${time} için plan ${genreToSave ? genreToSave + ' olarak ayarlandı.' : 'temizlendi.'}` });
         setIsModalOpen(false);
-        await fetchSchedules(false); // Re-fetch from localStorage to update UI
+        await fetchSchedules(false); 
       } else {
         toast({ variant: 'destructive', title: 'Kaydetme Hatası', description: actionResult.error || "Bilinmeyen bir hata oluştu." });
+        console.error(`[WeeklySave] Failed to save slot. Error: ${actionResult.error}`);
       }
     });
   };
   
   const handleClearSlot = () => {
-    if (!currentCell) return;
+    if (!currentCell) {
+        console.error("[WeeklyClear] Cannot clear, currentCell is null.");
+        return;
+    }
     const { day, time } = currentCell;
-     startTransition(async () => {
-      // Call server action to validate/prepare (genre will be null)
-      const actionResult = await saveWeeklyScheduleSlotAction(day, time, null); 
-      
-      if (actionResult.success) {
-        // Use mock-db to delete from localStorage
-        await dbDeleteWeeklyScheduleByDayTime(day, time);
-        
-        toast({ title: 'Plan Temizlendi', description: `${DAYS_OF_WEEK.find(d=>d.value === day)?.name} ${time} için plan temizlendi.` });
-        setIsModalOpen(false);
-        setSelectedGenre(undefined); 
-        await fetchSchedules(false); // Re-fetch from localStorage to update UI
-      } else {
-        toast({ variant: 'destructive', title: 'Temizleme Hatası', description: actionResult.error || "Bilinmeyen bir hata oluştu." });
-      }
-    });
+    console.log(`[WeeklyClear] Attempting to clear slot: Day ${day}, Time ${time}`);
+    setSelectedGenre(undefined); // Ensure selectedGenre is cleared for saving logic
+    
+    // We call handleSaveSlot, which will now see selectedGenre as undefined (or null after the next line)
+    // and thus interpret it as a clear/delete operation.
+    // This reuses the existing save logic where genreToSave will be null.
+    handleSaveSlot(); 
   }
 
   if (isLoading) {
@@ -237,7 +278,7 @@ export default function WeeklySchedulePage() {
         <AlertTriangle className="mx-auto h-12 w-12 mb-4" />
         <h2 className="text-2xl font-semibold mb-2">Plan Yüklenirken Hata Oluştu</h2>
         <p>{error}</p>
-        <Button onClick={() => fetchSchedules(true)} variant="destructive" className="mt-4">Tekrar Dene</Button>
+        <Button onClick={() => { fetchSchedules(true); checkAndRunWeeklyGenerations(true); }} variant="destructive" className="mt-4">Tekrar Dene ve Kontrol Et</Button>
       </div>
     );
   }
@@ -246,7 +287,7 @@ export default function WeeklySchedulePage() {
     <div className="space-y-8">
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <h1 className="text-3xl md:text-4xl font-bold text-foreground tracking-tight">Haftalık Hikaye Üretim Planı</h1>
-         <Button onClick={checkAndRunWeeklyGenerations} disabled={isCheckingWeekly || isTransitioning} variant="outline">
+         <Button onClick={() => checkAndRunWeeklyGenerations(true)} disabled={isCheckingWeekly || isTransitioning} variant="outline">
           {isCheckingWeekly ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Clock className="mr-2 h-4 w-4" />}
           Şimdi Haftalık Planı Kontrol Et
         </Button>
@@ -282,7 +323,7 @@ export default function WeeklySchedulePage() {
                       key={`${day.value}-${hour}`} 
                       className="py-2 px-1.5 text-center border cursor-pointer hover:bg-accent/20 transition-colors duration-150 h-16"
                       onClick={() => handleCellClick(day.value, hour)}
-                      title={`${day.name} ${hour} için plan ${schedule ? schedule.genre : 'oluştur/düzenle'}`}
+                      title={`${day.name} ${hour} için plan ${schedule ? `'${schedule.genre}' düzenle` : 'oluştur'}`}
                     >
                       {schedule ? (
                         <div className="bg-primary/10 text-primary font-medium p-2 rounded-md text-xs h-full flex items-center justify-center">
@@ -308,7 +349,7 @@ export default function WeeklySchedulePage() {
             <DialogHeader>
               <DialogTitle>Planı Düzenle: {DAYS_OF_WEEK.find(d=>d.value === currentCell.day)?.name} - {currentCell.time}</DialogTitle>
               <DialogDescription>
-                Bu zaman dilimi için bir hikaye türü seçin veya planı temizleyin.
+                Bu zaman dilimi için bir hikaye türü seçin veya mevcut planı temizlemek için türü boş bırakıp kaydedin.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -317,38 +358,33 @@ export default function WeeklySchedulePage() {
                   Tür
                 </Label>
                 <div className="col-span-3">
-                  <Select value={selectedGenre} onValueChange={(value) => setSelectedGenre(value as StoryGenre)}>
+                  <Select 
+                    value={selectedGenre || ""} // Use empty string for placeholder if undefined
+                    onValueChange={(value) => setSelectedGenre(value === "" ? undefined : value as StoryGenre)} // Set to undefined if ""
+                  >
                     <SelectTrigger id="genre-select-modal">
-                      <SelectValue placeholder="Bir tür seçin..." />
+                      <SelectValue placeholder="Tür seçilmedi (Planı temizle)" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="">Tür seçilmedi (Planı temizle)</SelectItem>
                       {GENRES.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
             </div>
-            <DialogFooter className="flex-col sm:flex-row sm:justify-between gap-2">
+            <DialogFooter className="flex-col sm:flex-row sm:justify-end gap-2">
+               {/* Removed separate clear button, integrated into save logic */}
+              <DialogClose asChild>
+                <Button variant="outline" disabled={isTransitioning}>İptal</Button>
+              </DialogClose>
               <Button 
-                onClick={handleClearSlot} 
-                variant="destructive" 
-                disabled={isTransitioning || !currentCell.genre}
+                onClick={handleSaveSlot} 
+                disabled={isTransitioning || selectedGenre === currentCell.genre}
               >
-                {isTransitioning && currentCell.genre && !selectedGenre ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                Planı Temizle
+                {isTransitioning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                {selectedGenre ? "Kaydet" : "Planı Temizle"}
               </Button>
-              <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
-                <DialogClose asChild>
-                  <Button variant="outline">İptal</Button>
-                </DialogClose>
-                <Button 
-                  onClick={handleSaveSlot} 
-                  disabled={isTransitioning || selectedGenre === currentCell.genre}
-                >
-                  {isTransitioning && (selectedGenre !== currentCell.genre) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                  Kaydet
-                </Button>
-              </div>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -356,3 +392,4 @@ export default function WeeklySchedulePage() {
     </div>
   );
 }
+

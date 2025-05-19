@@ -2,6 +2,7 @@
 'use client'; // Add 'use client' for localStorage access in getStories
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams as useNextSearchParams } from 'next/navigation'; // Renamed to avoid conflict
 import { getStories } from '@/lib/mock-db';
 import type { Story, StoryGenre } from '@/lib/types';
 import { StoryCard } from '@/components/site/StoryCard';
@@ -13,12 +14,13 @@ import { Header } from '@/components/site/Header';
 import { Footer } from '@/components/site/Footer';
 import { APP_NAME } from '@/lib/constants';
 
-interface HomePageProps {
-  searchParams: {
-    genre?: StoryGenre;
-    q?: string;
-  };
-}
+// Removed HomePageProps as searchParams will be accessed via hook
+// interface HomePageProps {
+//   searchParams: {
+//     genre?: StoryGenre;
+//     q?: string;
+//   };
+// }
 
 function StoriesList({ genre, query }: { genre?: StoryGenre; query?: string }) {
   const [stories, setStories] = useState<Story[]>([]);
@@ -79,9 +81,10 @@ function StoriesList({ genre, query }: { genre?: StoryGenre; query?: string }) {
   );
 }
 
-export default function HomePage({ searchParams }: HomePageProps) {
-  const currentGenre = searchParams.genre;
-  const searchQuery = searchParams.q;
+export default function HomePage() { // Removed searchParams from props
+  const searchParams = useNextSearchParams(); // Use the hook
+  const currentGenre = searchParams.get('genre') as StoryGenre | undefined || undefined; // Get genre
+  const searchQuery = searchParams.get('q') || undefined; // Get q
 
   // This ensures that on the client, if searchParams change, the component re-renders
   // and StoriesList (which is client-side due to useEffect) re-fetches.

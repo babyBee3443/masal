@@ -3,10 +3,11 @@
 'use server';
 
 import type { Story, StoryGenre, ScheduledGeneration, WeeklyScheduleItem, DayOfWeek } from '@/lib/types';
-import { 
-    getStoryById as dbGetStoryById,
-    getScheduledGenerationById as dbGetScheduledGenerationById,
-} from '@/lib/mock-db'; 
+// Removed direct import of dbGetScheduledGenerationById as server actions shouldn't directly access client localStorage
+// import { 
+//     getStoryById as dbGetStoryById,
+//     getScheduledGenerationById as dbGetScheduledGenerationById,
+// } from '@/lib/mock-db'; 
 
 import { generateStory as aiGenerateStory } from '@/ai/flows/generate-story';
 import { regenerateAIImage as aiRegenerateAIImage } from '@/ai/flows/generate-image';
@@ -18,9 +19,9 @@ import { regenerateAIImage as aiRegenerateAIImage } from '@/ai/flows/generate-im
 // 3. Reading data if a server component needs it (though prefer client for localStorage consistency).
 
 export async function publishStoryAction(storyId: string) {
-  console.warn("publishStoryAction (server): Client should handle localStorage update.");
-  const story = await dbGetStoryById(storyId); 
-  if (!story) return { success: false, error: 'Hikaye bulunamadı (sunucu okuma)' };
+  console.warn("publishStoryAction (server): Client should handle localStorage update. This action now only returns data for the client to act upon.");
+  // const story = await dbGetStoryById(storyId); // Server actions shouldn't directly access client localStorage
+  // if (!story) return { success: false, error: 'Hikaye bulunamadı (sunucu okuma)' };
   
   return { 
       success: true, 
@@ -35,12 +36,12 @@ export async function publishStoryAction(storyId: string) {
 }
 
 export async function deleteStoryAction(storyId: string) {
-  console.warn("deleteStoryAction (server): Client should handle localStorage deletion.");
+  console.warn("deleteStoryAction (server): Client should handle localStorage deletion. This action only returns an ID for the client.");
   return { success: true, storyIdToDelete: storyId }; 
 }
 
 export async function updateStoryCategoryAction(storyId: string, newGenre: StoryGenre) {
-  console.warn("updateStoryCategoryAction (server): Client should handle localStorage update.");
+  console.warn("updateStoryCategoryAction (server): Client should handle localStorage update. This action returns data for client update.");
   return { success: true, storyDataToUpdate: { id: storyId, genre: newGenre } };
 }
 
@@ -49,17 +50,21 @@ export async function generateNewStoryAction(genre: StoryGenre): Promise<{ succe
   try {
     console.log(`[Action] generateNewStoryAction: Generating story for genre: ${genre}`);
     const aiResult = await aiGenerateStory({ genre });
-    console.log(`[Action] generateNewStoryAction: AI result received:`, !!aiResult.title);
+    console.log(`[Action] generateNewStoryAction: AI result received: Title: ${aiResult?.title ? 'Yes' : 'No'}, Content: ${aiResult?.content ? 'Yes' : 'No'}, ImageUrl: ${aiResult?.imageUrl ? 'Yes' : 'No'}`);
 
-    if (!aiResult || !aiResult.title || !aiResult.content) {
-      console.error("[Action] generateNewStoryAction: AI did not return expected title or content.", aiResult);
-      throw new Error('Yapay zeka hikaye başlığı veya içeriği oluşturamadı.');
+    if (!aiResult || !aiResult.title || !aiResult.content || !aiResult.imageUrl) {
+      console.error("[Action] generateNewStoryAction: AI did not return expected title, content, or imageUrl.", aiResult);
+      let specificError = 'Yapay zeka hikaye başlığı, içeriği veya görseli oluşturamadı.';
+      if (!aiResult?.title) specificError += ' Başlık eksik.';
+      if (!aiResult?.content) specificError += ' İçerik eksik.';
+      if (!aiResult?.imageUrl) specificError += ' Görsel URL eksik.';
+      throw new Error(specificError);
     }
 
     const newStoryData: Omit<Story, 'id' | 'summary' | 'createdAt'> & {status: 'pending'} = {
       title: aiResult.title,
       content: aiResult.content,
-      imageUrl: aiResult.imageUrl || 'https://placehold.co/600x480.png', 
+      imageUrl: aiResult.imageUrl, 
       genre: genre,
       status: 'pending', 
     };
@@ -76,6 +81,10 @@ export async function generateNewStoryAction(genre: StoryGenre): Promise<{ succe
     // @ts-ignore
     if (error?.details?.code === 'ABORTED' && error?.details?.message?.includes('SafetyPolicyViolation')) {
       errorMessage = 'Hikaye üretimi güvenlik politikalarını ihlal ettiği için engellendi. Lütfen farklı bir tür veya konu deneyin.';
+    }
+    // @ts-ignore
+    else if (error?.cause?.code === 'blocked' && error?.cause?.message?.includes('SAFETY')) {
+        errorMessage = 'Hikaye üretimi güvenlik filtreleri tarafından engellendi. İçerik uygunsuz olabilir.';
     }
     
     return { success: false, error: errorMessage };
@@ -96,14 +105,14 @@ export async function regenerateStoryImageAction(storyId: string, storyText: str
 }
 
 export async function scheduleStoryPublicationAction(storyId: string, date: string, time: string): Promise<{ success: boolean; storyDataToUpdate?: Partial<Story> & { id: string }; error?: string }> {
-  console.warn("scheduleStoryPublicationAction (server): Client handles localStorage update.");
-  const story = await dbGetStoryById(storyId); 
-    if (!story) {
-      return { success: false, error: "Hikaye bulunamadı." };
-    }
-    if (story.status === 'published') {
-      return { success: false, error: "Yayınlanmış hikayeler tekrar zamanlanamaz." };
-    }
+  console.warn("scheduleStoryPublicationAction (server): Client handles localStorage update. This action returns data for client update.");
+  // const story = await dbGetStoryById(storyId); // Server actions shouldn't directly access client localStorage
+  //   if (!story) {
+  //     return { success: false, error: "Hikaye bulunamadı." };
+  //   }
+  //   if (story.status === 'published') {
+  //     return { success: false, error: "Yayınlanmış hikayeler tekrar zamanlanamaz." };
+  //   }
   return { 
     success: true, 
     storyDataToUpdate: { 
@@ -124,6 +133,7 @@ export async function scheduleStoryGenerationAction(
   newScheduledGenerationData?: Omit<ScheduledGeneration, 'id' | 'status' | 'createdAt'>;
   error?: string 
 }> {
+  console.warn("scheduleStoryGenerationAction (server): Client will handle localStorage addition. This action only returns data for the client.");
   try {
     if (!scheduledDate || !scheduledTime || !genre) {
       return { success: false, error: "Lütfen tarih, saat ve tür bilgilerini eksiksiz girin." };
@@ -141,31 +151,25 @@ export async function scheduleStoryGenerationAction(
   }
 }
 
-export async function processScheduledGenerationAction(id: string): Promise<{ 
+export async function processScheduledGenerationAction(id: string, genre: StoryGenre): Promise<{ 
   success: boolean; 
-  storyData?: Omit<Story, 'id' | 'summary' | 'createdAt'> & {status: 'pending'}; // This is what dbAddStory expects
+  storyData?: Omit<Story, 'id' | 'summary' | 'createdAt'> & {status: 'pending'}; 
   error?: string; 
-  scheduledGenerationId: string;
+  scheduledGenerationId: string; // Ensure ID is always returned for client-side status update
 }> {
-  console.log(`[Action] processScheduledGenerationAction: Processing ID: ${id}`);
-  const scheduledItem = await dbGetScheduledGenerationById(id); 
-  if (!scheduledItem) {
-    console.error(`[Action] processScheduledGenerationAction: Scheduled item not found for ID: ${id}`);
-    return { success: false, error: "Planlanmış üretim bulunamadı (sunucu okuma).", scheduledGenerationId: id };
-  }
-
-  if (scheduledItem.status === 'generated') {
-    // This check is on potentially stale server-side data if client has updated localStorage.
-    // Client should prevent re-processing 'generated' items.
-    // console.warn(`[Action] processScheduledGenerationAction: Item ${id} already generated.`);
-    // return { success: false, error: "Bu üretim zaten tamamlanmış.", scheduledGenerationId: id };
-  }
+  console.log(`[Action] processScheduledGenerationAction: Processing ID: ${id} for Genre: ${genre}`);
+  // const scheduledItem = await dbGetScheduledGenerationById(id); // DO NOT CALL THIS FROM SERVER ACTION
+  // if (!scheduledItem) {
+  //   console.error(`[Action] processScheduledGenerationAction: Scheduled item not found for ID: ${id}`);
+  //   return { success: false, error: "Planlanmış üretim bulunamadı (sunucu okuma).", scheduledGenerationId: id };
+  // }
 
   try {
-    const generationResult = await generateNewStoryAction(scheduledItem.genre);
+    // Use the genre passed from the client
+    const generationResult = await generateNewStoryAction(genre);
 
     if (generationResult.success && generationResult.storyData) {
-      console.log(`[Action] processScheduledGenerationAction: Story generated successfully for ID: ${id}, Genre: ${scheduledItem.genre}`);
+      console.log(`[Action] processScheduledGenerationAction: Story generated successfully for ID: ${id}, Genre: ${genre}`);
       return { 
         success: true, 
         storyData: generationResult.storyData, 
@@ -191,17 +195,17 @@ export async function processScheduledGenerationAction(id: string): Promise<{
 }
 
 export async function deleteScheduledGenerationAction(id: string): Promise<{ success: boolean; error?: string; scheduledGenerationIdToDelete?: string }> {
-  console.warn("deleteScheduledGenerationAction (server): Client handles localStorage deletion.");
+  console.warn("deleteScheduledGenerationAction (server): Client handles localStorage deletion. This action returns ID for client.");
   return { success: true, scheduledGenerationIdToDelete: id };
 }
 
 export async function getWeeklySchedulesAction(): Promise<{ success: boolean; schedules?: WeeklyScheduleItem[]; error?: string; }> {
-  console.warn("getWeeklySchedulesAction (server): Reading from server context, may not reflect client's localStorage.");
+  console.warn("getWeeklySchedulesAction (server): Client reads from localStorage. This action returns empty array.");
   return { success: true, schedules: [] }; 
 }
 
 export async function saveWeeklyScheduleSlotAction(dayOfWeek: DayOfWeek, time: string, genre: StoryGenre | null): Promise<{ success: boolean; slotToSave?: {dayOfWeek: DayOfWeek, time: string, genre: StoryGenre | null }; error?: string; }> {
-  console.warn("saveWeeklyScheduleSlotAction (server): Client handles localStorage update.");
+  console.warn("saveWeeklyScheduleSlotAction (server): Client handles localStorage update. This action returns data for client.");
   return { success: true, slotToSave: { dayOfWeek, time, genre } };
 }
 

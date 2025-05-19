@@ -73,13 +73,14 @@ export default function SchedulingPage() {
           console.error("[Fetch] Error parsing scheduled date/time for item:", item.id, e);
           return false; 
         }
-      }).filter(item => !processingItems.has(item.id));
+      }).filter(item => !processingItems.has(item.id)); // Ensure not already processing
 
       console.log(`[Fetch] Found ${dueItems.length} due items to process automatically.`);
 
       if (dueItems.length > 0 && (isManualRefresh || !autoProcessingAttemptedOnLoad)) {
         const toastTitle = isManualRefresh ? "Manuel Üretim Kontrolü" : "Otomatik Üretim Kontrolü";
         
+        // Mark all due items as processing *before* starting the loop
         setProcessingItems(prev => {
           const next = new Set(prev);
           dueItems.forEach(item => next.add(item.id));
@@ -95,7 +96,8 @@ export default function SchedulingPage() {
         const processingPromises = dueItems.map(async (item) => {
           console.log(`[Fetch][AutoProcess] Starting for item ID: ${item.id}, Genre: ${item.genre}`);
           try {
-            const result = await processScheduledGenerationAction(item.id); 
+            // Pass item.genre to the action
+            const result = await processScheduledGenerationAction(item.id, item.genre); 
             console.log(`[Fetch][AutoProcess] Result for ${item.id}:`, result);
 
             if (result.success && result.storyData && result.scheduledGenerationId) {
@@ -154,7 +156,7 @@ export default function SchedulingPage() {
         setIsLoadingPage(false);
         console.log("[Fetch] setIsLoadingPage to false (initial load).");
       }
-      // Safety clear if page was loading and error occurred.
+       // Safety clear if page was loading and error occurred.
       if (isLoadingPage && error && showLoadingSpinner) setProcessingItems(new Set());
     }
   };
@@ -174,13 +176,14 @@ export default function SchedulingPage() {
       const actionResult = await scheduleStoryGenerationAction(dateString, newScheduleTime, newScheduleGenre as StoryGenre);
       
       if (actionResult.success && actionResult.newScheduledGenerationData) {
+        // Client-side localStorage update
         const { newScheduledGeneration, allItems } = await dbAddScheduledGeneration(actionResult.newScheduledGenerationData);
         
         toast({ 
           title: 'Hikaye Üretimi Planlandı', 
           description: `${newScheduledGeneration.genre} türünde hikaye ${formatDateDisplay(newScheduledGeneration.scheduledDate, newScheduledGeneration.scheduledTime)} için planlandı.` 
         });
-        setScheduledGenerations(allItems); 
+        setScheduledGenerations(allItems); // Use the complete, sorted list from dbAddScheduledGeneration
         
         setNewScheduleDate(new Date());
         setNewScheduleTime("10:00");
@@ -198,7 +201,7 @@ export default function SchedulingPage() {
     }
 
     console.log(`[ManualProcess] Starting for item ID: ${id}, Genre: ${genre}`);
-    setProcessingItems(prev => new Set(prev).add(id));
+    setProcessingItems(prev => new Set(prev).add(id)); // Mark as processing for UI update
     toast({
       title: "Manuel Üretim Başlatıldı",
       description: `"${genre}" türündeki hikaye şimdi üretiliyor... Lütfen bekleyin.`
@@ -206,52 +209,62 @@ export default function SchedulingPage() {
 
     startSavingOrDeletingTransition(async () => { 
       try {
-        const result = await processScheduledGenerationAction(id);
+        // Pass genre to the action
+        const result = await processScheduledGenerationAction(id, genre);
         console.log(`[ManualProcess] Result for ${id}:`, result);
 
         if (result.success && result.storyData && result.scheduledGenerationId) {
+          // Client-side localStorage updates
           const newStory = await dbAddStory(result.storyData);
           await dbUpdateScheduledGenerationStatus(result.scheduledGenerationId, 'generated', newStory.id);
           toast({ title: 'Hikaye Üretildi!', description: `"${newStory.title}" (${genre}) başarıyla oluşturuldu ve admin panelindeki kuyruğa eklendi.` });
         } else if (result.scheduledGenerationId) { 
+          // Client-side localStorage update for failure
           await dbUpdateScheduledGenerationStatus(result.scheduledGenerationId, 'failed', undefined, result.error || "Üretim Başarısız oldu, hikaye detayı alınamadı.");
           toast({ variant: 'destructive', title: 'Üretim Başarısız', description: `${genre} üretilemedi: ${result.error || "Hikaye detayı alınamadı."}` });
         } else { 
+           // This case should ideally not happen if scheduledGenerationId is always returned
            console.error(`[ManualProcess] Unknown error for ${id}, result did not contain scheduledGenerationId.`);
            toast({ variant: 'destructive', title: 'Üretim Hatası', description: `${genre} üretilemedi: ${result.error || "Bilinmeyen bir hata oluştu."}` });
-           // Attempt to mark as failed if ID is known
+           // Attempt to mark as failed if ID is known, even if action result was malformed
            await dbUpdateScheduledGenerationStatus(id, 'failed', undefined, result.error || "Bilinmeyen bir hata oluştu.");
         }
       } catch (e) {
         console.error(`[ManualProcess] Catch block error for ID: ${id}:`, e);
         toast({ variant: 'destructive', title: 'İşlem Sırasında Hata', description: e instanceof Error ? e.message : "Bilinmeyen bir hata." });
         try {
+          // Attempt to mark as failed in localStorage
           await dbUpdateScheduledGenerationStatus(id, 'failed', undefined, e instanceof Error ? e.message : "Beklenmedik hata sonucu işlem başarısız.");
         } catch (dbErr) { console.error("[ManualProcess] DB durum güncelleme hatası (catch):", dbErr); }
       } finally {
         console.log(`[ManualProcess] Finalizing for item ID: ${id}`);
-        setProcessingItems(prev => {
+        setProcessingItems(prev => { // Unmark as processing
           const next = new Set(prev);
           next.delete(id);
           console.log(`[ManualProcess] Removed ${id} from processingItems. Current:`, Array.from(next));
           return next;
         });
-        await fetchScheduledItems(true, false); // Re-fetch after processing, don't show main loading spinner
+        // Refresh the list from localStorage after processing
+        await fetchScheduledItems(true, false); 
       }
     });
   };
 
   const handleDeleteGeneration = (id: string, genre: StoryGenre, date: string, time: string) => {
     startSavingOrDeletingTransition(async () => {
+      // Optimistically update UI, though fetchScheduledItems will be the source of truth
       setScheduledGenerations(prev => prev.filter(item => item.id !== id));
+      
       const actionResult = await deleteScheduledGenerationAction(id);
       if (actionResult.success && actionResult.scheduledGenerationIdToDelete) {
+        // Client-side localStorage deletion
         await dbDeleteScheduledGenerationById(actionResult.scheduledGenerationIdToDelete);
         toast({ title: 'Plan Silindi', description: `${genre} türündeki ${formatDateDisplay(date, time)} tarihli plan silindi.` });
-        // No need to fetch again, list already optimistically updated. Can add fetch if issues.
+        // Re-fetch to ensure consistency, though optimistic update is done
+        await fetchScheduledItems(true, false); 
       } else {
         toast({ variant: 'destructive', title: 'Silme Başarısız', description: actionResult.error });
-        await fetchScheduledItems(true, false); 
+        await fetchScheduledItems(true, false); // Re-fetch on failure to revert optimistic update if needed
       }
     });
   };
@@ -431,7 +444,7 @@ export default function SchedulingPage() {
           Planlanmış Üretimler ({scheduledGenerations.length})
         </h2>
         <Button onClick={() => fetchScheduledItems(true, false)} variant="ghost" size="icon" className="ml-2" disabled={isRefreshDisabled}>
-            <RefreshCw className={`h-5 w-5 ${isRefreshDisabled && !isLoadingPage ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-5 w-5 ${(isRefreshDisabled && !isLoadingPage && processingItems.size > 0) || (isSavingOrDeleting && processingItems.size > 0) ? 'animate-spin' : ''}`} />
         </Button>
       </div>
 
@@ -512,7 +525,7 @@ export default function SchedulingPage() {
                         className="bg-destructive hover:bg-destructive/90"
                         disabled={isSavingOrDeleting || isCurrentlyProcessing}
                       >
-                        {(isSavingOrDeleting && processingItems.has(item.id) /* Only show spinner for this specific delete if it's part of a general save/delete transition */) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        {(isSavingOrDeleting && isCurrentlyProcessing /* Show spinner only if this delete is part of a general transition AND this item is processing */ ) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                         Evet, Planı Sil
                       </AlertDialogAction>
                     </AlertDialogFooter>

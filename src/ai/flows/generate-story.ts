@@ -6,17 +6,19 @@
  *
  * - generateStory - Hikaye üretme sürecini yöneten bir fonksiyon.
  * - GenerateStoryInput - generateStory fonksiyonu için giriş tipi.
- * - GenerateStoryOutputSchema - generateStory fonksiyonu için dönüş tipi şeması.
  * - GenerateStoryOutput - generateStory fonksiyonu için dönüş tipi.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import type { StoryLength, StoryComplexity } from '@/lib/constants';
 
 const GenerateStoryInputSchema = z.object({
   genre: z
     .string()
     .describe("Üretilecek hikayenin türü (örn. Korku, Macera, Romantik, Bilim Kurgu, Fabl, Felsefi)."),
+  length: z.string().optional().describe("İstenen hikaye uzunluğu (örn. kısa, orta, uzun). Boş bırakılırsa model varsayılan uzunluğu kullanır."),
+  complexity: z.string().optional().describe("İstenen hikaye karmaşıklığı ve detay seviyesi (örn. basit, orta, detaylı). Boş bırakılırsa model varsayılan karmaşıklığı kullanır."),
 });
 export type GenerateStoryInput = z.infer<typeof GenerateStoryInputSchema>;
 
@@ -28,13 +30,12 @@ const StoryTextOutputSchema = z.object({
 type StoryTextOutput = z.infer<typeof StoryTextOutputSchema>;
 
 // Schema for the final output of the flow, including the image URL
-// NOT EXPORTED as a const value from 'use server' file
-const GenerateStoryOutputSchema = z.object({
+const GenerateStoryOutputSchemaInternal = z.object({
   title: z.string().describe("Üretilen hikayenin başlığı."),
   content: z.string().describe("Üretilen hikayenin tam metin içeriği."),
   imageUrl: z.string().describe("Üretilen görseli içeren bir data URI. Beklenen format: 'data:<mimetype>;base64,<encoded_data>'"),
 });
-export type GenerateStoryOutput = z.infer<typeof GenerateStoryOutputSchema>; // Type export is fine
+export type GenerateStoryOutput = z.infer<typeof GenerateStoryOutputSchemaInternal>; // Type export is fine
 
 // This is the only function that should be exported for use by server actions or components.
 export async function generateStory(input: GenerateStoryInput): Promise<GenerateStoryOutput> {
@@ -46,6 +47,19 @@ const generateStoryPrompt = ai.definePrompt({
   input: {schema: GenerateStoryInputSchema},
   output: {schema: StoryTextOutputSchema},
   prompt: `Yaratıcı bir hikaye yazarısın. Aşağıdaki türde bir hikaye yaz: {{{genre}}}.
+{{#if length}}
+Hikayenin uzunluğu yaklaşık olarak "{{length}}" olmalıdır.
+{{else}}
+Hikayenin uzunluğu modelin takdirine bırakılmıştır.
+{{/if}}
+{{#if complexity}}
+Hikayenin karmaşıklığı ve detay seviyesi "{{complexity}}" olmalıdır.
+{{else}}
+Hikayenin karmaşıklığı ve detay seviyesi modelin takdirine bırakılmıştır.
+{{/if}}
+
+"kısa" uzunluk genellikle 3-5 paragraf, "orta" uzunluk 6-10 paragraf, "uzun" ise 10'dan fazla paragraf anlamına gelir.
+"basit" karmaşıklık daha az karakter ve olay, doğrudan bir anlatım; "orta" karmaşıklık birkaç yan karakter ve olay örgüsü; "detaylı" karmaşıklık ise zengin karakter gelişimi, çoklu olay örgüleri ve derinlemesine bir anlatım anlamına gelir.
 
 Bu hikayeyi Türkçe bir masal formatında oluşturmalısın. Masal yazarken aşağıdaki kurallara ve aşamalara uymalısın:
 
@@ -93,7 +107,7 @@ const generateStoryFlow = ai.defineFlow(
   {
     name: 'generateStoryFlow',
     inputSchema: GenerateStoryInputSchema,
-    outputSchema: GenerateStoryOutputSchema, // Final output schema for the flow
+    outputSchema: GenerateStoryOutputSchemaInternal, // Final output schema for the flow
   },
   async input => {
     // Generate story text (title and content)
@@ -125,4 +139,3 @@ const generateStoryFlow = ai.defineFlow(
     };
   }
 );
-

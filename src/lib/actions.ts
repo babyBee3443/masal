@@ -3,11 +3,8 @@
 'use server';
 
 import type { Story, StoryGenre, ScheduledGeneration, WeeklyScheduleItem, DayOfWeek } from '@/lib/types';
-// Removed direct import of dbGetScheduledGenerationById as server actions shouldn't directly access client localStorage
-// import { 
-//     getStoryById as dbGetStoryById,
-//     getScheduledGenerationById as dbGetScheduledGenerationById,
-// } from '@/lib/mock-db'; 
+import type { StoryLength, StoryComplexity } from '@/lib/constants';
+
 
 import { generateStory as aiGenerateStory } from '@/ai/flows/generate-story';
 import { regenerateAIImage as aiRegenerateAIImage } from '@/ai/flows/generate-image';
@@ -46,10 +43,14 @@ export async function updateStoryCategoryAction(storyId: string, newGenre: Story
 }
 
 
-export async function generateNewStoryAction(genre: StoryGenre): Promise<{ success: boolean; storyData?: Omit<Story, 'id' | 'summary' | 'createdAt'> & {status: 'pending'}; error?: string, story?: Story }> {
+export async function generateNewStoryAction(
+  genre: StoryGenre, 
+  length?: StoryLength, 
+  complexity?: StoryComplexity
+): Promise<{ success: boolean; storyData?: Omit<Story, 'id' | 'summary' | 'createdAt'> & {status: 'pending'}; error?: string, story?: Story }> {
   try {
-    console.log(`[Action] generateNewStoryAction: Generating story for genre: ${genre}`);
-    const aiResult = await aiGenerateStory({ genre });
+    console.log(`[Action] generateNewStoryAction: Generating story for genre: ${genre}, length: ${length}, complexity: ${complexity}`);
+    const aiResult = await aiGenerateStory({ genre, length, complexity });
     console.log(`[Action] generateNewStoryAction: AI result received: Title: ${aiResult?.title ? 'Yes' : 'No'}, Content: ${aiResult?.content ? 'Yes' : 'No'}, ImageUrl: ${aiResult?.imageUrl ? 'Yes' : 'No'}`);
 
     if (!aiResult || !aiResult.title || !aiResult.content || !aiResult.imageUrl) {
@@ -68,6 +69,10 @@ export async function generateNewStoryAction(genre: StoryGenre): Promise<{ succe
       imageUrl: aiResult.imageUrl, 
       genre: genre,
       status: 'pending', 
+      // length and complexity are not part of the Story type, so not included here
+      // If they were, they would be:
+      // length: length, 
+      // complexity: complexity,
     };
     console.log(`[Action] generateNewStoryAction: Story data prepared successfully for genre: ${genre}`);
     // The actual Story object (with id, summary, createdAt) will be created client-side by mock-db.ts's addStory
@@ -155,7 +160,9 @@ export async function processScheduledGenerationAction(id: string, genre: StoryG
   console.log(`[Action] processScheduledGenerationAction: Processing ID: ${id} for Genre: ${genre}`);
   
   try {
-    const generationResult = await generateNewStoryAction(genre);
+    // For scheduled generations, we'll use default length and complexity for now.
+    // This could be extended in the future if ScheduledGeneration type stores these.
+    const generationResult = await generateNewStoryAction(genre, undefined, undefined);
 
     if (generationResult.success && generationResult.storyData) {
       console.log(`[Action] processScheduledGenerationAction: Story generated successfully for ID: ${id}, Genre: ${genre}`);
@@ -190,9 +197,7 @@ export async function deleteScheduledGenerationAction(id: string): Promise<{ suc
 
 export async function getWeeklySchedulesAction(): Promise<{ success: boolean; schedules?: WeeklyScheduleItem[]; error?: string; }> {
   console.warn("getWeeklySchedulesAction (server): Client reads from localStorage. This action should primarily be for server-side data fetching if needed, returning empty for localStorage.");
-  // In a real app with a DB, this would fetch from the DB.
-  // For localStorage, client will call mock-db directly.
-  return { success: true, schedules: [] }; // Return empty as client will handle localStorage
+  return { success: true, schedules: [] }; 
 }
 
 export async function saveWeeklyScheduleSlotAction(
@@ -205,9 +210,7 @@ export async function saveWeeklyScheduleSlotAction(
   error?: string; 
 }> {
   console.warn("saveWeeklyScheduleSlotAction (server): Client will handle localStorage update. This action only returns data for the client.");
-  // This action validates and returns the data. Client-side will call mock-db.
   try {
-    // Basic validation can happen here if needed, e.g., check if genre is valid or null
     if (genre && !["Korku", "Macera", "Romantik", "Bilim Kurgu", "Fabl", "Felsefi"].includes(genre)) {
         return { success: false, error: "Geçersiz tür." };
     }

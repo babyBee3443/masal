@@ -7,11 +7,11 @@ import Link from 'next/link';
 import type { ScheduledGeneration, StoryGenre, Story } from '@/lib/types';
 import { 
     getScheduledGenerations, 
-    addScheduledGeneration as dbAddScheduledGeneration, // Renamed to avoid conflict
+    addScheduledGeneration as dbAddScheduledGeneration,
     deleteScheduledGenerationById as dbDeleteScheduledGenerationById,
     updateScheduledGenerationStatus as dbUpdateScheduledGenerationStatus
-} from '@/lib/mock-db'; // Import directly for client-side localStorage access
-import { GENRES, APP_NAME } from '@/lib/constants';
+} from '@/lib/mock-db'; 
+import { GENRES } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -40,9 +40,9 @@ import { Separator } from '@/components/ui/separator';
 
 export default function SchedulingPage() {
   const [scheduledGenerations, setScheduledGenerations] = useState<ScheduledGeneration[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingPage, setIsLoadingPage] = useState(true); // Renamed for clarity
   const [error, setError] = useState<string | null>(null);
-  const [isTransitioning, startTransition] = useTransition();
+  const [isSavingOrDeleting, startSavingOrDeletingTransition] = useTransition(); // For add/delete
   const { toast } = useToast();
 
   const [newScheduleDate, setNewScheduleDate] = useState<Date | undefined>(new Date());
@@ -50,19 +50,20 @@ export default function SchedulingPage() {
   const [newScheduleGenre, setNewScheduleGenre] = useState<StoryGenre | undefined>(undefined);
   
   const [autoProcessingAttemptedOnLoad, setAutoProcessingAttemptedOnLoad] = useState(false);
-
+  const [processingItems, setProcessingItems] = useState<Set<string>>(new Set()); // Tracks IDs of items being processed
 
   const fetchScheduledItems = async (isManualRefresh = false) => {
-    if(!isManualRefresh && !autoProcessingAttemptedOnLoad) {
-      setIsLoading(true); 
+    if (!isManualRefresh && !autoProcessingAttemptedOnLoad) {
+      setIsLoadingPage(true);
     }
     setError(null);
     try {
-      let items = await getScheduledGenerations(); // Direct call to mock-db
+      let items = await getScheduledGenerations(); 
       const now = new Date();
       
       const dueItems = items.filter(item => {
         if (item.status !== 'pending') return false;
+        if (processingItems.has(item.id)) return false; // Don't re-process if already processing
         try {
           const scheduledDateTime = parseISO(`${item.scheduledDate}T${item.scheduledTime}`);
           return isValid(scheduledDateTime) && scheduledDateTime <= now;
@@ -74,19 +75,19 @@ export default function SchedulingPage() {
 
       if (dueItems.length > 0 && (isManualRefresh || !autoProcessingAttemptedOnLoad)) {
         const toastTitle = isManualRefresh ? "Manuel Üretim Kontrolü" : "Otomatik Üretim Kontrolü";
-        if(isManualRefresh || !autoProcessingAttemptedOnLoad){
-            toast({
-                title: toastTitle,
-                description: `${dueItems.length} adet zamanı gelmiş planlı üretim işleniyor... Bu işlem biraz sürebilir.`,
-            });
+        if (isManualRefresh || !autoProcessingAttemptedOnLoad) {
+          toast({
+            title: toastTitle,
+            description: `${dueItems.length} adet zamanı gelmiş planlı üretim işleniyor...`,
+          });
         }
 
         const processingPromises = dueItems.map(async (item) => {
+          setProcessingItems(prev => new Set(prev).add(item.id));
+          toast({ title: "Otomatik Üretim Başladı", description: `"${item.genre}" türündeki hikaye şimdi üretiliyor...`});
           try {
-            // Server action still orchestrates AI call
             const result = await processScheduledGenerationAction(item.id); 
             if (result.success && result.story && result.scheduledGenerationId) {
-              // Client updates its own localStorage for status
               await dbUpdateScheduledGenerationStatus(result.scheduledGenerationId, 'generated', result.story.id);
               toast({
                 variant: "default",
@@ -116,12 +117,18 @@ export default function SchedulingPage() {
                 title: "Otomatik Üretim Hatası",
                 description: `${item.genre} türündeki zamanlanmış hikaye işlenirken bir hata oluştu: ${e instanceof Error ? e.message : String(e)}`,
               });
+          } finally {
+            setProcessingItems(prev => {
+              const next = new Set(prev);
+              next.delete(item.id);
+              return next;
+            });
           }
         });
         await Promise.allSettled(processingPromises);
         
         if (!autoProcessingAttemptedOnLoad && !isManualRefresh) setAutoProcessingAttemptedOnLoad(true);
-        items = await getScheduledGenerations(); // Re-fetch after all processing
+        items = await getScheduledGenerations(); 
       }
       
       setScheduledGenerations(items);
@@ -129,7 +136,7 @@ export default function SchedulingPage() {
       setError(e instanceof Error ? e.message : 'Planlanmış üretimler yüklenemedi.');
       console.error(e);
     } finally {
-      if(!isManualRefresh && !autoProcessingAttemptedOnLoad && isLoading) setIsLoading(false);
+      if (!isManualRefresh && !autoProcessingAttemptedOnLoad && isLoadingPage) setIsLoadingPage(false);
     }
   };
   
@@ -144,19 +151,17 @@ export default function SchedulingPage() {
       return;
     }
     const dateString = format(newScheduleDate, 'yyyy-MM-dd');
-    startTransition(async () => {
-      // Server action prepares data, does not write to localStorage
+    startSavingOrDeletingTransition(async () => {
       const actionResult = await scheduleStoryGenerationAction(dateString, newScheduleTime, newScheduleGenre);
       
       if (actionResult.success && actionResult.newScheduledGenerationData) {
-        // Client calls db function to save to localStorage
         const { newScheduledGeneration, allItems } = await dbAddScheduledGeneration(actionResult.newScheduledGenerationData);
         
         toast({ 
           title: 'Hikaye Üretimi Planlandı', 
           description: `${newScheduledGeneration.genre} türünde hikaye ${formatDateDisplay(newScheduledGeneration.scheduledDate, newScheduledGeneration.scheduledTime)} için planlandı.` 
         });
-        setScheduledGenerations(allItems); // Update UI with the list from localStorage
+        setScheduledGenerations(allItems);
         
         setNewScheduleDate(new Date());
         setNewScheduleTime("10:00");
@@ -168,37 +173,52 @@ export default function SchedulingPage() {
   };
 
   const handleProcessGeneration = (id: string) => {
-    startTransition(async () => {
-      const itemToProcess = scheduledGenerations.find(item => item.id === id);
-      toast({
-        title: "Manuel Üretim Başlatıldı",
-        description: `"${itemToProcess?.genre}" türündeki hikaye şimdi üretiliyor...`
-      });
-      // Server action handles AI call
-      const result = await processScheduledGenerationAction(id);
-      if (result.success && result.story && result.scheduledGenerationId) {
-        // Client updates localStorage status
-        await dbUpdateScheduledGenerationStatus(result.scheduledGenerationId, 'generated', result.story.id);
-        toast({ title: 'Hikaye Üretildi!', description: `"${result.story.title}" başarıyla oluşturuldu. Admin panelinde görebilirsiniz.` });
-      } else if (result.scheduledGenerationId) {
-        await dbUpdateScheduledGenerationStatus(result.scheduledGenerationId, 'failed', undefined, result.error || "Üretim Başarısız");
-        toast({ variant: 'destructive', title: 'Üretim Başarısız', description: result.error });
-      } else {
-         toast({ variant: 'destructive', title: 'Üretim Hatası', description: result.error || "Bilinmeyen bir hata oluştu." });
+    if (processingItems.has(id)) return;
+
+    const itemToProcess = scheduledGenerations.find(item => item.id === id);
+    if (!itemToProcess) return;
+
+    setProcessingItems(prev => new Set(prev).add(id));
+    toast({
+      title: "Manuel Üretim Başlatıldı",
+      description: `"${itemToProcess.genre}" türündeki hikaye şimdi üretiliyor...`
+    });
+
+    startSavingOrDeletingTransition(async () => { // Use the same transition for all modifications
+      try {
+        const result = await processScheduledGenerationAction(id);
+        if (result.success && result.story && result.scheduledGenerationId) {
+          await dbUpdateScheduledGenerationStatus(result.scheduledGenerationId, 'generated', result.story.id);
+          toast({ title: 'Hikaye Üretildi!', description: `"${result.story.title}" başarıyla oluşturuldu. Admin panelinde görebilirsiniz.` });
+        } else if (result.scheduledGenerationId) {
+          await dbUpdateScheduledGenerationStatus(result.scheduledGenerationId, 'failed', undefined, result.error || "Üretim Başarısız");
+          toast({ variant: 'destructive', title: 'Üretim Başarısız', description: result.error });
+        } else {
+           toast({ variant: 'destructive', title: 'Üretim Hatası', description: result.error || "Bilinmeyen bir hata oluştu." });
+        }
+      } catch (e) {
+        toast({ variant: 'destructive', title: 'İşlem Sırasında Hata', description: e instanceof Error ? e.message : "Bilinmeyen bir hata." });
+        try {
+          await dbUpdateScheduledGenerationStatus(id, 'failed', undefined, e instanceof Error ? e.message : "Beklenmedik hata sonucu işlem başarısız.");
+        } catch (dbErr) { console.error("DB durum güncelleme hatası:", dbErr); }
+      } finally {
+        await fetchScheduledItems(true); // Re-fetch to update UI and clear related states
+        setProcessingItems(prev => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
       }
-      fetchScheduledItems(true); // Re-fetch to update UI
     });
   };
 
   const handleDeleteGeneration = (id: string, genre: StoryGenre, date: string, time: string) => {
-    startTransition(async () => {
-      // Server action just acknowledges
+    startSavingOrDeletingTransition(async () => {
       const actionResult = await deleteScheduledGenerationAction(id);
       if (actionResult.success && actionResult.scheduledGenerationIdToDelete) {
-        // Client deletes from localStorage
         await dbDeleteScheduledGenerationById(actionResult.scheduledGenerationIdToDelete);
         toast({ title: 'Plan Silindi', description: `${genre} türündeki ${formatDateDisplay(date, time)} tarihli plan silindi.` });
-        fetchScheduledItems(true); // Re-fetch to update UI
+        fetchScheduledItems(true);
       } else {
         toast({ variant: 'destructive', title: 'Silme Başarısız', description: actionResult.error });
       }
@@ -247,8 +267,10 @@ export default function SchedulingPage() {
     }
   };
 
-
-  const getStatusBadge = (status: ScheduledGeneration['status']) => {
+  const getStatusBadge = (status: ScheduledGeneration['status'], itemId: string) => {
+    if (processingItems.has(itemId)) {
+      return <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300"><Loader2 className="mr-1 h-3 w-3 animate-spin" />İşleniyor...</Badge>;
+    }
     switch (status) {
       case 'pending':
         return <Badge variant="outline" className="bg-yellow-100 text-yellow-700 border-yellow-300"><CalendarClock className="mr-1 h-3 w-3" />Beklemede</Badge>;
@@ -261,7 +283,7 @@ export default function SchedulingPage() {
     }
   };
   
-  if (isLoading && !autoProcessingAttemptedOnLoad && scheduledGenerations.length === 0) { 
+  if (isLoadingPage && !autoProcessingAttemptedOnLoad && scheduledGenerations.length === 0) { 
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -304,7 +326,6 @@ export default function SchedulingPage() {
           </div>
         </div>
       </div>
-
 
       <Card className="shadow-lg">
         <CardHeader>
@@ -363,8 +384,8 @@ export default function SchedulingPage() {
               </Select>
             </div>
           </div>
-          <Button onClick={handleAddScheduledGeneration} disabled={isTransitioning || !newScheduleDate || !newScheduleTime || !newScheduleGenre} className="w-full md:w-auto">
-            {isTransitioning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarCheck2 className="mr-2 h-4 w-4" />}
+          <Button onClick={handleAddScheduledGeneration} disabled={isSavingOrDeleting || !newScheduleDate || !newScheduleTime || !newScheduleGenre} className="w-full md:w-auto">
+            {isSavingOrDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarCheck2 className="mr-2 h-4 w-4" />}
             Üretimi Planla
           </Button>
         </CardContent>
@@ -376,12 +397,12 @@ export default function SchedulingPage() {
         <h2 className="text-2xl md:text-3xl font-semibold text-foreground tracking-tight">
           Planlanmış Üretimler ({scheduledGenerations.length})
         </h2>
-        <Button onClick={() => fetchScheduledItems(true)} variant="ghost" size="icon" className="ml-2" disabled={isTransitioning || (isLoading && autoProcessingAttemptedOnLoad) }>
-            <RefreshCw className={`h-5 w-5 ${(isTransitioning || (isLoading && autoProcessingAttemptedOnLoad)) ? 'animate-spin' : ''}`} />
+        <Button onClick={() => fetchScheduledItems(true)} variant="ghost" size="icon" className="ml-2" disabled={isSavingOrDeleting || (isLoadingPage && autoProcessingAttemptedOnLoad) || processingItems.size > 0 }>
+            <RefreshCw className={`h-5 w-5 ${(isSavingOrDeleting || (isLoadingPage && autoProcessingAttemptedOnLoad) || processingItems.size > 0) ? 'animate-spin' : ''}`} />
         </Button>
       </div>
 
-      {(isLoading && scheduledGenerations.length === 0 && !autoProcessingAttemptedOnLoad) ? (
+      {(isLoadingPage && scheduledGenerations.length === 0 && !autoProcessingAttemptedOnLoad) ? (
          <div className="flex justify-center items-center min-h-[200px]">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p className="ml-3 text-muted-foreground">Planlar yükleniyor...</p>
@@ -394,12 +415,14 @@ export default function SchedulingPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {scheduledGenerations.map(item => (
+          {scheduledGenerations.map(item => {
+            const isCurrentlyProcessing = processingItems.has(item.id);
+            return (
             <Card key={item.id} className="shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle className="flex justify-between items-center">
                   <span>{item.genre} Türünde Hikaye</span>
-                  {getStatusBadge(item.status)}
+                  {getStatusBadge(item.status, item.id)}
                 </CardTitle>
                 <CardDescription>
                   Planlanan Zaman: {formatDateDisplay(item.scheduledDate, item.scheduledTime)}
@@ -420,21 +443,25 @@ export default function SchedulingPage() {
                  </CardContent>
               )}
               <CardFooter className="flex flex-wrap justify-end gap-2">
-                {item.status === 'pending' && (
-                  <Button onClick={() => handleProcessGeneration(item.id)} disabled={isTransitioning} variant="default">
-                    {isTransitioning && scheduledGenerations.find(s => s.id === item.id)?.status !== 'pending' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
-                    Şimdi Üret
-                  </Button>
-                )}
-                 {item.status === 'failed' && ( 
-                  <Button onClick={() => handleProcessGeneration(item.id)} disabled={isTransitioning} variant="outline">
-                    {isTransitioning && scheduledGenerations.find(s => s.id === item.id)?.status !== 'failed' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                    Tekrar Dene
+                {(item.status === 'pending' || item.status === 'failed') && (
+                  <Button 
+                    onClick={() => handleProcessGeneration(item.id)} 
+                    disabled={isSavingOrDeleting || isCurrentlyProcessing}
+                    variant={item.status === 'failed' ? "outline" : "default"}
+                  >
+                    {isCurrentlyProcessing ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : item.status === 'failed' ? (
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                    ) : (
+                        <Wand2 className="mr-2 h-4 w-4" />
+                    )}
+                    {item.status === 'failed' ? 'Tekrar Dene' : 'Şimdi Üret'}
                   </Button>
                 )}
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button variant="destructive" disabled={isTransitioning}>
+                    <Button variant="destructive" disabled={isSavingOrDeleting || isCurrentlyProcessing}>
                       <Trash2 className="mr-2 h-4 w-4" /> Sil
                     </Button>
                   </AlertDialogTrigger>
@@ -446,13 +473,13 @@ export default function SchedulingPage() {
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel disabled={isTransitioning}>İptal</AlertDialogCancel>
+                      <AlertDialogCancel disabled={isSavingOrDeleting}>İptal</AlertDialogCancel>
                       <AlertDialogAction
                         onClick={() => handleDeleteGeneration(item.id, item.genre, item.scheduledDate, item.scheduledTime)}
                         className="bg-destructive hover:bg-destructive/90"
-                        disabled={isTransitioning}
+                        disabled={isSavingOrDeleting}
                       >
-                        {isTransitioning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        {isSavingOrDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                         Evet, Planı Sil
                       </AlertDialogAction>
                     </AlertDialogFooter>
@@ -460,7 +487,7 @@ export default function SchedulingPage() {
                 </AlertDialog>
               </CardFooter>
             </Card>
-          ))}
+          )})}
         </div>
       )}
     </div>

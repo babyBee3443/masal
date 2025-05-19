@@ -6,6 +6,7 @@
  *
  * - generateStory - Hikaye üretme sürecini yöneten bir fonksiyon.
  * - GenerateStoryInput - generateStory fonksiyonu için giriş tipi.
+ * - GenerateStoryOutputSchema - generateStory fonksiyonu için dönüş tipi şeması.
  * - GenerateStoryOutput - generateStory fonksiyonu için dönüş tipi.
  */
 
@@ -34,6 +35,7 @@ export const GenerateStoryOutputSchema = z.object({
 });
 export type GenerateStoryOutput = z.infer<typeof GenerateStoryOutputSchema>;
 
+// This is the only function that should be exported for use by server actions or components.
 export async function generateStory(input: GenerateStoryInput): Promise<GenerateStoryOutput> {
   return generateStoryFlow(input);
 }
@@ -41,7 +43,7 @@ export async function generateStory(input: GenerateStoryInput): Promise<Generate
 const generateStoryPrompt = ai.definePrompt({
   name: 'generateStoryPrompt',
   input: {schema: GenerateStoryInputSchema},
-  output: {schema: StoryTextOutputSchema}, // Updated to use StoryTextOutputSchema
+  output: {schema: StoryTextOutputSchema}, 
   prompt: `Yaratıcı bir hikaye yazarısın. Aşağıdaki türde bir hikaye yaz: {{{genre}}}.
 
 Bu hikayeyi Türkçe bir masal formatında oluşturmalısın. Masal yazarken aşağıdaki kurallara ve aşamalara uymalısın:
@@ -122,4 +124,3 @@ const generateStoryFlow = ai.defineFlow(
     };
   }
 );
-

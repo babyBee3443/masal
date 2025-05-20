@@ -18,36 +18,36 @@ const RegenerateAIImageInputSchema = z.object({
 export type RegenerateAIImageInput = z.infer<typeof RegenerateAIImageInputSchema>;
 
 // NOT EXPORTED as a const value from 'use server' file
-const RegenerateAIImageOutputSchema = z.object({
+const RegenerateAIImageOutputSchemaInternal = z.object({
   imageUrl: z.string().describe('Yeni oluşturulan görselin data URIsi.'),
 });
-export type RegenerateAIImageOutput = z.infer<typeof RegenerateAIImageOutputSchema>; // Type export is fine
+export type RegenerateAIImageOutput = z.infer<typeof RegenerateAIImageOutputSchemaInternal>; // Type export is fine
 
 export async function regenerateAIImage(input: RegenerateAIImageInput): Promise<RegenerateAIImageOutput> {
   return regenerateAIImageFlow(input);
 }
 
-const regenerateAIImagePrompt = ai.definePrompt({
-  name: 'regenerateAIImagePrompt',
+// This prompt is not directly used for image generation model, but can be used for pre-processing text if needed.
+// The actual image generation prompt is constructed within the flow.
+const regenerateAIImageTextPrompt = ai.definePrompt({
+  name: 'regenerateAIImageTextPrompt',
   input: {schema: RegenerateAIImageInputSchema},
-  // output: {schema: RegenerateAIImageOutputSchema}, // Output schema is handled by the image generation model directly
-  prompt: `Aşağıdaki hikayenin özünü yakalayan görsel olarak çarpıcı bir resim oluşturun:\n\n{{{storyText}}}\n\nLütfen oluşturulan görselin tüm kitleler için uygun olduğundan emin olun.`,
+  prompt: `Aşağıdaki hikayenin özünü yakalayan görsel olarak çarpıcı bir resim oluşturun:\n\n{{{storyText}}}\n\nLütfen oluşturulan görselin tüm kitleler için uygun olduğundan emin olun. ÖNEMLİ: Lütfen oluşturulan görselde HİÇBİR yazı, harf veya kelime KULLANMA. Sadece görsel öğeler olsun.`,
 });
 
 const regenerateAIImageFlow = ai.defineFlow(
   {
     name: 'regenerateAIImageFlow',
     inputSchema: RegenerateAIImageInputSchema,
-    outputSchema: RegenerateAIImageOutputSchema,
+    outputSchema: RegenerateAIImageOutputSchemaInternal,
   },
   async input => {
-    // Using regenerateAIImagePrompt to potentially process text before image generation if needed, though here it's direct.
-    // For this specific case, the prompt text for image generation is simple enough.
-    // const processedInput = await regenerateAIImagePrompt(input); // If pre-processing was needed
+    // Construct the prompt for the image generation model directly
+    const imagePrompt = `Aşağıdaki hikayenin özünü yakalayan görsel olarak çarpıcı bir resim oluşturun: ${input.storyText.substring(0, 500)}...\n\nÖNEMLİ: Lütfen oluşturulan görselde HİÇBİR yazı, harf veya kelime KULLANMA. Sadece görsel öğeler olsun.`;
 
     const {media} = await ai.generate({
       model: 'googleai/gemini-2.0-flash-exp',
-      prompt: `Aşağıdaki hikayenin özünü yakalayan görsel olarak çarpıcı bir resim oluşturun: ${input.storyText}`, // Directly use input or processed input
+      prompt: imagePrompt, 
       config: {
         responseModalities: ['TEXT', 'IMAGE'],
       },

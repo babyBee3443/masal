@@ -30,6 +30,7 @@ const StoryTextOutputSchema = z.object({
 type StoryTextOutput = z.infer<typeof StoryTextOutputSchema>;
 
 // Schema for the final output of the flow, including the image URL
+// NOT EXPORTED as a const value from 'use server' file
 const GenerateStoryOutputSchemaInternal = z.object({
   title: z.string().describe("Üretilen hikayenin başlığı."),
   content: z.string().describe("Üretilen hikayenin tam metin içeriği."),
@@ -120,9 +121,11 @@ const generateStoryFlow = ai.defineFlow(
     const { title, content } = storyTextResult.output;
 
     // Generate image based on the story title/content
+    const imagePrompt = `"${title}" başlıklı masal için fantastik ve masalsı bir illüstrasyon oluştur. Masalın konusu: ${content.substring(0, 200)}...\n\nÖNEMLİ: Lütfen oluşturulan görselde HİÇBİR yazı, harf veya kelime KULLANMA. Sadece görsel öğeler olsun.`;
+    
     const {media} = await ai.generate({
       model: 'googleai/gemini-2.0-flash-exp',
-      prompt: `"${title}" başlıklı masal için fantastik ve masalsı bir illüstrasyon oluştur. Masalın konusu: ${content.substring(0, 200)}...`, // Use title and a snippet of content for image prompt
+      prompt: imagePrompt,
       config: {
         responseModalities: ['TEXT', 'IMAGE'],
       },
@@ -139,3 +142,4 @@ const generateStoryFlow = ai.defineFlow(
     };
   }
 );
+

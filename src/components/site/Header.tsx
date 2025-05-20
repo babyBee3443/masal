@@ -33,7 +33,7 @@ const mainNavLink = { href: '/', label: 'Anasayfa', icon: Home };
 const adminPanelLink = { href: '/admin', label: 'Admin Paneli', icon: BookOpen };
 
 const GenreIcon = ({ genre, className }: { genre: StoryGenre; className?: string }) => {
-  const defaultClassName = "mr-2 h-5 w-5 text-primary";
+  const defaultClassName = "mr-3 h-5 w-5"; // Adjusted margin
   const iconClassName = cn(defaultClassName, className);
   switch (genre) {
     case 'Korku': return <Ghost className={iconClassName} />;
@@ -51,7 +51,6 @@ export function Header() {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  // Removed hover-related state: isCategoriesMenuOpen, categoriesMenuTimeoutRef
 
   useEffect(() => {
     const handleScroll = () => {
@@ -61,7 +60,6 @@ export function Header() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Removed hover-related functions: openCategoriesMenu, closeCategoriesMenuWithDelay
 
   const NavLinkItem = ({ href, label, icon: Icon, exact = false }: { href: string; label: string; icon: React.ElementType; exact?: boolean}) => {
     const isActive = exact ? pathname === href : pathname.startsWith(href);
@@ -114,7 +112,7 @@ export function Header() {
             </Link>
           </Button>
 
-          <DropdownMenu> {/* Removed open and onOpenChange props for hover behavior */}
+          <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
@@ -122,80 +120,70 @@ export function Header() {
                   "text-sm font-medium transition-colors hover:text-primary px-3 py-2",
                   pathname.startsWith('/categories') ? "text-primary" : "text-foreground/70"
                 )}
-                // Removed onMouseEnter, onMouseLeave event handlers
               >
                 <LayoutGrid className="mr-2 h-4 w-4" />
                 Kategoriler
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
-              className="w-[680px] p-4 bg-card shadow-xl rounded-lg border"
-              sideOffset={10}
-              // Removed onMouseEnter, onMouseLeave event handlers
+              className="w-[760px] p-6 bg-gradient-to-br from-[hsl(var(--primary)/0.85)] via-[hsl(var(--accent)/0.8)] to-[hsl(var(--card)/0.85)] backdrop-blur-lg border border-[hsl(var(--border)/0.2)] shadow-2xl rounded-xl text-primary-foreground"
+              sideOffset={15}
             >
-              <div className="grid grid-cols-3 gap-x-6">
+              <div className="grid grid-cols-3 gap-x-8">
                 {/* Column 1: DüşBox Kategorileri */}
-                <div className="space-y-2">
-                  <DropdownMenuLabel className="text-base font-semibold text-foreground px-2">DüşBox Kategorileri</DropdownMenuLabel>
-                  <DropdownMenuSeparator className="my-1" />
+                <div className="space-y-1">
+                  <DropdownMenuLabel className="text-base font-semibold text-primary-foreground/90 px-1 mb-2 border-b border-primary-foreground/20 pb-2">DüşBox Kategorileri</DropdownMenuLabel>
                   {GENRES.map((genre) => (
-                    <DropdownMenuItem key={genre} asChild className="p-0 group">
-                      <Link href={`/categories/${genre}`} className="flex items-center w-full px-2 py-2 text-sm rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
-                        <GenreIcon genre={genre} className="h-5 w-5 mr-3 text-muted-foreground group-hover:text-accent-foreground" />
-                        <span>{genre}</span>
+                    <DropdownMenuItem key={genre} asChild className="p-0 group focus:bg-primary-foreground/10">
+                      <Link href={`/categories/${genre}`} className="flex items-center w-full px-2 py-2.5 text-sm rounded-md text-primary-foreground/80 hover:bg-primary-foreground/10 hover:text-primary-foreground transition-colors duration-200">
+                        <GenreIcon genre={genre} className="text-primary-foreground/70 group-hover:text-primary-foreground/90 transition-colors duration-200" />
+                        <span className="font-medium">{genre}</span>
                       </Link>
                     </DropdownMenuItem>
                   ))}
                 </div>
 
                 {/* Column 2: Öne Çıkan Masal */}
-                <div className="space-y-2">
-                  <DropdownMenuLabel className="text-base font-semibold text-foreground px-2">Öne Çıkan Masal</DropdownMenuLabel>
-                   <DropdownMenuSeparator className="my-1" />
-                  <div className="px-2">
-                    <Link href="/story/placeholder-featured" className="group block rounded-md overflow-hidden">
+                <div className="space-y-3">
+                  <DropdownMenuLabel className="text-base font-semibold text-primary-foreground/90 px-1 mb-2 border-b border-primary-foreground/20 pb-2">Öne Çıkan Masal</DropdownMenuLabel>
+                  <div className="px-1">
+                    <Link href="/story/placeholder-featured" className="group block rounded-lg overflow-hidden hover:shadow-lg transition-shadow duration-300">
                       <Image
                         src="https://placehold.co/600x400.png"
                         alt="Öne Çıkan Masal"
-                        width={200}
-                        height={120}
-                        className="w-full h-32 object-cover rounded-md mb-2 transition-transform duration-300 group-hover:scale-105"
+                        width={220}
+                        height={130}
+                        className="w-full h-36 object-cover rounded-md mb-3 transition-transform duration-300 group-hover:scale-105"
                         data-ai-hint="fantasy landscape"
                       />
-                      <h4 className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">Efsanevi Ejderhanın Sırrı</h4>
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">Kadim dağların ardında, efsanevi bir ejderhanın koruduğu bir sır...</p>
+                      <h4 className="text-sm font-semibold text-primary-foreground group-hover:text-accent transition-colors px-1">Efsanevi Ejderhanın Sırrı</h4>
+                      <p className="text-xs text-primary-foreground/70 mt-1 line-clamp-2 px-1">Kadim dağların ardında, efsanevi bir ejderhanın koruduğu bir sır...</p>
                     </Link>
                   </div>
                 </div>
 
                 {/* Column 3: Popüler Masallar */}
-                <div className="space-y-2">
-                  <DropdownMenuLabel className="text-base font-semibold text-foreground px-2">Popüler Masallar</DropdownMenuLabel>
-                  <DropdownMenuSeparator className="my-1" />
-                  <DropdownMenuItem asChild className="p-0 group">
-                    <Link href="/story/placeholder-popular-1" className="flex items-center w-full px-2 py-2 text-sm rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
-                      <TrendingUp className="h-5 w-5 mr-3 text-muted-foreground group-hover:text-accent-foreground"/>
-                      <span>Yıldız Tozu ve Hayaller</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild className="p-0 group">
-                     <Link href="/story/placeholder-popular-2" className="flex items-center w-full px-2 py-2 text-sm rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
-                      <TrendingUp className="h-5 w-5 mr-3 text-muted-foreground group-hover:text-accent-foreground"/>
-                      <span>Unutulmuş Krallık</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild className="p-0 group">
-                     <Link href="/story/placeholder-popular-3" className="flex items-center w-full px-2 py-2 text-sm rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
-                      <TrendingUp className="h-5 w-5 mr-3 text-muted-foreground group-hover:text-accent-foreground"/>
-                      <span>Denizin Altındaki Melodi</span>
-                    </Link>
-                  </DropdownMenuItem>
-                   <DropdownMenuItem disabled className="px-2 py-2 text-xs text-muted-foreground">Daha fazlası yakında...</DropdownMenuItem>
+                <div className="space-y-1">
+                  <DropdownMenuLabel className="text-base font-semibold text-primary-foreground/90 px-1 mb-2 border-b border-primary-foreground/20 pb-2">Popüler Masallar</DropdownMenuLabel>
+                  {[
+                    { title: "Yıldız Tozu ve Hayaller", href: "/story/placeholder-popular-1" },
+                    { title: "Unutulmuş Krallık", href: "/story/placeholder-popular-2" },
+                    { title: "Denizin Altındaki Melodi", href: "/story/placeholder-popular-3" },
+                    { title: "Saklı Bahçenin Şarkısı", href: "/story/placeholder-popular-4" },
+                  ].map((item) => (
+                    <DropdownMenuItem key={item.title} asChild className="p-0 group focus:bg-primary-foreground/10">
+                     <Link href={item.href} className="flex items-center w-full px-2 py-2.5 text-sm rounded-md text-primary-foreground/80 hover:bg-primary-foreground/10 hover:text-primary-foreground transition-colors duration-200">
+                        <TrendingUp className="h-5 w-5 mr-3 text-primary-foreground/70 group-hover:text-primary-foreground/90 transition-colors duration-200"/>
+                        <span className="font-medium">{item.title}</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  ))}
+                   <DropdownMenuItem disabled className="px-2 py-2 text-xs text-primary-foreground/50">Daha fazlası yakında...</DropdownMenuItem>
                 </div>
               </div>
-              <DropdownMenuSeparator className="my-3" />
+              <DropdownMenuSeparator className="my-4 bg-primary-foreground/20" />
               <div className="text-center">
-                <Button variant="ghost" asChild size="sm" className="w-full hover:bg-primary/10">
+                <Button variant="ghost" asChild size="sm" className="w-full text-primary-foreground/80 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors duration-200 py-2">
                   <Link href={`/categories/${GENRES[0]}`}>
                     Tüm Kategorileri Gör
                   </Link>
@@ -228,7 +216,7 @@ export function Header() {
                 <Link href="/" onClick={() => setIsMobileMenuOpen(false)}>
                   <Logo className="h-8 w-auto" />
                 </Link>
-                <SheetTitle className="sr-only">Ana Menü</SheetTitle> {/* Added sr-only for accessibility */}
+                <SheetTitle className="sr-only">Ana Menü</SheetTitle>
                 <SheetClose asChild>
                   <Button variant="ghost" size="icon">
                     <X className="h-6 w-6" />

@@ -38,9 +38,8 @@ export function Logo(props: SVGProps<SVGSVGElement>) {
         `}
       </style>
       
-      {/* Icon: Open Book (inspired by Lucide BookOpen) */}
-      {/* Adjusted y-translate for icon to center it better in the new viewbox height */}
-      <g transform="translate(10, 11) scale(1.25)" fill="url(#logoGradient)">
+      {/* Icon: Open Book - Adjusted scale and y-translate for DüşBox */}
+      <g transform="translate(10, 12.5) scale(1.15)" fill="url(#logoGradient)"> 
         {/* Path 1 for open book */}
         <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
         {/* Path 2 for open book */}

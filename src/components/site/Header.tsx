@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -33,7 +32,7 @@ const mainNavLink = { href: '/', label: 'Anasayfa', icon: Home };
 const adminPanelLink = { href: '/admin', label: 'Admin Paneli', icon: BookOpen };
 
 const GenreIcon = ({ genre, className }: { genre: StoryGenre; className?: string }) => {
-  const defaultClassName = "mr-3 h-5 w-5 text-primary/80 group-hover:text-accent transition-colors duration-200";
+  const defaultClassName = "mr-3 h-5 w-5 text-accent/80 group-hover:text-primary transition-colors duration-200";
   const iconClassName = cn(defaultClassName, className);
   switch (genre) {
     case 'Korku': return <Ghost className={iconClassName} />;
@@ -54,33 +53,37 @@ export function Header() {
 
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
+      setIsScrolled(window.scrollY > 10); // Trigger earlier for consistent background
     };
     window.addEventListener('scroll', handleScroll);
+    handleScroll(); // Check on mount
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
 
   const NavLinkItem = ({ href, label, icon: Icon, exact = false, isMobile = false }: { href: string; label: string; icon: React.ElementType; exact?: boolean; isMobile?: boolean}) => {
-    const isActive = exact ? pathname === href : pathname.startsWith(href);
+    const isActivePath = exact ? pathname === href : pathname.startsWith(href);
+    // Ensure "Anasayfa" is only active on exact match, but "Kategoriler" is active if path starts with /categories
+    const isActive = (exact && pathname === href) || (!exact && href !== '/' && pathname.startsWith(href)) || (href === '/' && pathname === '/');
+
+    const baseClasses = "justify-start text-base font-medium transition-all duration-200 ease-out";
+    const desktopClasses = "px-4 py-2.5 text-sm rounded-lg";
+    const mobileClasses = "w-full py-3 text-lg";
+
     return (
       <Button 
         variant="ghost" 
         asChild 
         className={cn(
-          "justify-start text-base font-medium transition-colors hover:text-primary",
-          isActive ? "text-primary font-semibold" : "text-foreground/70",
-          isMobile ? "w-full py-3 text-lg" : "px-3 py-2 text-sm relative group/nav-link" // Added group/nav-link for desktop underline
+          baseClasses,
+          isMobile ? mobileClasses : desktopClasses,
+          isActive 
+            ? (isMobile ? "text-primary font-semibold" : "bg-accent/15 text-accent font-semibold hover:bg-accent/20")
+            : (isMobile ? "text-foreground/70 hover:text-primary" : "text-foreground/80 hover:bg-accent/10 hover:text-accent")
       )}>
-        <Link href={href} onClick={() => setIsMobileMenuOpen(false)}>
+        <Link href={href} onClick={() => {if (isMobile) setIsMobileMenuOpen(false)}}>
           <Icon className={cn("mr-2 h-5 w-5", isMobile && "h-6 w-6")} />
           {label}
-          {!isMobile && ( // Underline for desktop links
-            <span className={cn(
-              "absolute bottom-0 left-0 w-full h-0.5 bg-accent scale-x-0 group-hover/nav-link:scale-x-100 transition-transform duration-300 ease-out",
-              isActive && "scale-x-100"
-            )}></span>
-          )}
         </Link>
       </Button>
     );
@@ -96,9 +99,9 @@ export function Header() {
         className={cn(
           "justify-start font-medium transition-colors hover:text-primary",
           isActive ? "text-primary font-semibold" : "text-foreground/70",
-          isMobile ? "w-full py-2.5 text-md pl-10" : "text-sm pl-8" // Adjusted padding for desktop consistency
+          isMobile ? "w-full py-2.5 text-md pl-10" : "text-sm pl-8" 
        )}>
-        <Link href={href} onClick={() => setIsMobileMenuOpen(false)}>
+        <Link href={href} onClick={() => {if (isMobile) setIsMobileMenuOpen(false)}}>
           {isMobile && <GenreIcon genre={genre} className="mr-3 h-5 w-5 text-foreground/60 group-hover:text-primary" />}
           {genre}
         </Link>
@@ -108,12 +111,12 @@ export function Header() {
 
   return (
     <header className={cn(
-      "sticky top-0 z-50 w-full transition-all duration-300",
-      isScrolled ? "bg-background/80 backdrop-blur-md shadow-lg border-b border-border/20" : "bg-transparent"
+      "sticky top-0 z-50 w-full transition-shadow duration-300", // Removed backdrop-blur from here
+      isScrolled ? "bg-background/95 backdrop-blur-md shadow-lg border-b border-border/20" : "bg-transparent border-b border-transparent" 
     )}>
       <div className="container mx-auto flex h-20 items-center justify-between px-4 md:px-6">
-        <Link href="/" aria-label={`${APP_NAME} Anasayfa`} className="z-10">
-          <Logo className="h-10 w-auto transition-transform duration-300 hover:scale-105" />
+        <Link href="/" aria-label={`${APP_NAME} Anasayfa`} className="z-10 transform transition-transform duration-300 hover:scale-105">
+          <Logo className="h-10 md:h-12 w-auto" />
         </Link>
 
         {/* Desktop Navigation */}
@@ -125,34 +128,31 @@ export function Header() {
               <Button
                 variant="ghost"
                 className={cn(
-                  "text-sm font-medium transition-colors hover:text-primary px-3 py-2 relative group/nav-link",
-                  pathname.startsWith('/categories') ? "text-primary font-semibold" : "text-foreground/70"
+                  "px-4 py-2.5 text-sm font-medium transition-all duration-200 ease-out rounded-lg flex items-center gap-2", // Added flex, items-center, gap-2
+                  pathname.startsWith('/categories') 
+                    ? "bg-accent/15 text-accent font-semibold hover:bg-accent/20" 
+                    : "text-foreground/80 hover:bg-accent/10 hover:text-accent"
                 )}
               >
-                <LayoutGrid className="mr-2 h-4 w-4" />
+                <LayoutGrid className="h-4 w-4" /> {/* Icon is now direct child */}
                 Kategoriler
-                <ChevronDown className="ml-1 h-4 w-4 opacity-70 group-hover/nav-link:text-primary transition-colors" />
-                 <span className={cn( // Underline for desktop links
-                    "absolute bottom-0 left-0 w-full h-0.5 bg-accent scale-x-0 group-hover/nav-link:scale-x-100 transition-transform duration-300 ease-out",
-                    pathname.startsWith('/categories') && "scale-x-100"
-                  )}></span>
+                <ChevronDown className="ml-1 h-4 w-4 opacity-70 transition-transform group-data-[state=open]:rotate-180" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
-              className="w-[800px] p-6 bg-card/90 backdrop-blur-xl border border-primary/20 shadow-2xl rounded-xl mt-2"
+              className="w-[880px] p-6 bg-card/95 backdrop-blur-xl border-2 border-primary/40 shadow-2xl rounded-2xl mt-3"
               sideOffset={15}
               align="center"
             >
               <div className="grid grid-cols-3 gap-x-8 gap-y-4">
-                {/* Column 1: DüşBox Kategorileri */}
                 <div className="space-y-2">
-                  <DropdownMenuLabel className="text-lg font-bold text-primary px-1 pb-2 border-b border-primary/20 flex items-center">
-                    <Sparkles className="mr-2 h-5 w-5 text-accent"/>
+                  <DropdownMenuLabel className="text-lg font-bold text-primary px-2 pb-2.5 mb-3 border-b-2 border-primary/25 flex items-center">
+                    <Sparkles className="mr-2.5 h-5 w-5 text-accent"/>
                     DüşBox Kategorileri
                   </DropdownMenuLabel>
                   {GENRES.map((genre) => (
-                    <DropdownMenuItem key={genre} asChild className="p-0 group focus:bg-primary/10 rounded-md">
-                      <Link href={`/categories/${genre}`} className="flex items-center w-full px-2.5 py-3 text-sm rounded-md text-foreground/80 hover:bg-primary/10 hover:text-primary transition-colors duration-200">
+                    <DropdownMenuItem key={genre} asChild className="p-0 group focus:bg-accent/15 rounded-lg">
+                      <Link href={`/categories/${genre}`} className="flex items-center w-full px-3 py-3 text-base rounded-lg text-foreground/90 hover:bg-accent/15 hover:text-accent transition-colors duration-200">
                         <GenreIcon genre={genre} />
                         <span className="font-medium">{genre}</span>
                       </Link>
@@ -160,32 +160,30 @@ export function Header() {
                   ))}
                 </div>
 
-                {/* Column 2: Öne Çıkan Masal */}
                 <div className="space-y-3">
-                  <DropdownMenuLabel className="text-lg font-bold text-primary px-1 pb-2 border-b border-primary/20 flex items-center">
-                     <TrendingUp className="mr-2 h-5 w-5 text-accent"/>
+                  <DropdownMenuLabel className="text-lg font-bold text-primary px-2 pb-2.5 mb-3 border-b-2 border-primary/25 flex items-center">
+                     <TrendingUp className="mr-2.5 h-5 w-5 text-accent"/>
                     Öne Çıkan Masal
                   </DropdownMenuLabel>
                   <div className="px-1">
-                    <Link href="/story/placeholder-featured" className="group block rounded-lg overflow-hidden hover:shadow-xl transition-shadow duration-300 border border-transparent hover:border-accent/50 p-2 bg-background/30 hover:bg-background/50">
+                    <Link href="/story/placeholder-featured" className="group block rounded-lg overflow-hidden hover:shadow-xl transition-shadow duration-300 border border-transparent hover:border-accent/50 p-3 bg-background/40 hover:bg-background/60">
                       <Image
-                        src="https://placehold.co/600x400.png"
+                        src="https://placehold.co/250x150.png"
                         alt="Öne Çıkan Masal"
-                        width={220}
-                        height={130}
-                        className="w-full h-36 object-cover rounded-md mb-3 transition-transform duration-300 group-hover:scale-105"
-                        data-ai-hint="fantasy landscape"
+                        width={250}
+                        height={150}
+                        className="w-full h-40 object-cover rounded-md mb-3.5 transition-transform duration-300 group-hover:scale-105"
+                        data-ai-hint="fantasy abstract"
                       />
-                      <h4 className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors px-1">Efsanevi Ejderhanın Sırrı</h4>
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2 px-1">Kadim dağların ardında, efsanevi bir ejderhanın koruduğu bir sır...</p>
+                      <h4 className="text-base font-semibold text-foreground group-hover:text-accent transition-colors px-1">Efsanevi Ejderhanın Sırrı</h4>
+                      <p className="text-sm text-muted-foreground mt-1.5 line-clamp-2 px-1">Kadim dağların ardında, efsanevi bir ejderhanın koruduğu bir sır...</p>
                     </Link>
                   </div>
                 </div>
 
-                {/* Column 3: Popüler Masallar */}
                 <div className="space-y-2">
-                  <DropdownMenuLabel className="text-lg font-bold text-primary px-1 pb-2 border-b border-primary/20 flex items-center">
-                     <BookOpen className="mr-2 h-5 w-5 text-accent"/>
+                  <DropdownMenuLabel className="text-lg font-bold text-primary px-2 pb-2.5 mb-3 border-b-2 border-primary/25 flex items-center">
+                     <BookOpen className="mr-2.5 h-5 w-5 text-accent"/>
                      Popüler Masallar
                   </DropdownMenuLabel>
                   {[
@@ -194,19 +192,19 @@ export function Header() {
                     { title: "Denizin Altındaki Melodi", href: "/story/placeholder-popular-3" },
                     { title: "Saklı Bahçenin Şarkısı", href: "/story/placeholder-popular-4" },
                   ].map((item) => (
-                    <DropdownMenuItem key={item.title} asChild className="p-0 group focus:bg-primary/10 rounded-md">
-                     <Link href={item.href} className="flex items-center w-full px-2.5 py-3 text-sm rounded-md text-foreground/80 hover:bg-primary/10 hover:text-primary transition-colors duration-200">
-                        <Sparkles className="h-5 w-5 mr-3 text-primary/80 group-hover:text-accent transition-colors duration-200"/>
+                    <DropdownMenuItem key={item.title} asChild className="p-0 group focus:bg-accent/15 rounded-lg">
+                     <Link href={item.href} className="flex items-center w-full px-3 py-3 text-base rounded-lg text-foreground/90 hover:bg-accent/15 hover:text-accent transition-colors duration-200">
+                        <Sparkles className="h-5 w-5 mr-3 text-accent/80 group-hover:text-primary transition-colors duration-200"/>
                         <span className="font-medium">{item.title}</span>
                       </Link>
                     </DropdownMenuItem>
                   ))}
-                   <DropdownMenuItem disabled className="px-2.5 py-2 text-xs text-muted-foreground/70">Daha fazlası yakında...</DropdownMenuItem>
+                   <DropdownMenuItem disabled className="px-3 py-2.5 text-sm text-muted-foreground/60">Daha fazlası yakında...</DropdownMenuItem>
                 </div>
               </div>
-              <DropdownMenuSeparator className="my-4 bg-primary/20" />
+              <DropdownMenuSeparator className="my-5 bg-primary/25" />
               <div className="text-center">
-                <Button variant="outline" asChild size="sm" className="w-full text-primary hover:text-accent hover:border-accent transition-colors duration-200 py-2.5 border-primary/50 hover:bg-primary/5">
+                <Button variant="outline" asChild size="lg" className="w-full md:w-auto text-primary hover:text-accent hover:border-accent transition-colors duration-200 py-3 border-primary/60 hover:bg-primary/5">
                   <Link href={`/categories/${GENRES[0]}`}>
                     Tüm Kategorileri Gör
                   </Link>
@@ -227,12 +225,12 @@ export function Header() {
                 <span className="sr-only">Menüyü aç</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-full max-w-xs bg-background/90 backdrop-blur-lg p-0 shadow-xl flex flex-col border-l border-border/30">
+            <SheetContent side="right" className="w-full max-w-xs bg-background/95 backdrop-blur-lg p-0 shadow-xl flex flex-col border-l border-border/30">
               <SheetHeader className="p-4 flex flex-row justify-between items-center border-b border-border/30">
                 <Link href="/" onClick={() => setIsMobileMenuOpen(false)}>
                   <Logo className="h-9 w-auto" />
                 </Link>
-                <SheetTitle className="sr-only">Ana Menü</SheetTitle>
+                <SheetTitle className="sr-only">Ana Menü</SheetTitle> {/* Added for accessibility */}
                 <SheetClose asChild>
                   <Button variant="ghost" size="icon" className="text-foreground hover:text-primary">
                     <X className="h-6 w-6" />
@@ -243,7 +241,7 @@ export function Header() {
               <nav className="flex flex-col space-y-2 p-4 flex-grow overflow-y-auto">
                 <NavLinkItem href={mainNavLink.href} label={mainNavLink.label} icon={mainNavLink.icon} exact={true} isMobile={true}/>
 
-                <div> {/* Wrapper for Kategoriler and its sub-items */}
+                <div> 
                   <NavLinkItem href={`/categories/${GENRES[0]}`} label="Kategoriler" icon={LayoutGrid} isMobile={true}/>
                   <div className="flex flex-col mt-1 space-y-0.5 pl-4 border-l-2 border-primary/20 ml-3">
                     {GENRES.map(genre => <CategoryLinkItem key={genre} genre={genre} isMobile={true}/>)}

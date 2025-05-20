@@ -1,9 +1,16 @@
 
 'use client';
 
-import { useState, useTransition } from 'react';
-import type { StoryGenre } from '@/lib/types';
-import { GENRES, STORY_LENGTHS, STORY_COMPLEXITIES, type StoryLength, type StoryComplexity } from '@/lib/constants';
+import { useState, useTransition, useEffect } from 'react';
+import type { StoryGenre, StorySubGenre } from '@/lib/types';
+import { 
+  GENRES, 
+  STORY_LENGTHS, 
+  STORY_COMPLEXITIES, 
+  SUBGENRES_MAP,
+  type StoryLength, 
+  type StoryComplexity 
+} from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,27 +25,39 @@ interface GenerateStorySectionProps {
 
 export function GenerateStorySection({ onStoryGenerated }: GenerateStorySectionProps) {
   const [selectedGenre, setSelectedGenre] = useState<StoryGenre | undefined>(undefined);
-  const [selectedLength, setSelectedLength] = useState<StoryLength | undefined>(STORY_LENGTHS[1].value); // Default to medium
-  const [selectedComplexity, setSelectedComplexity] = useState<StoryComplexity | undefined>(STORY_COMPLEXITIES[1].value); // Default to medium
+  const [selectedSubGenre, setSelectedSubGenre] = useState<StorySubGenre | undefined>(undefined);
+  const [availableSubGenres, setAvailableSubGenres] = useState<{ value: StorySubGenre; label: string }[]>([]);
+  
+  const [selectedLength, setSelectedLength] = useState<StoryLength | undefined>(STORY_LENGTHS[1].value);
+  const [selectedComplexity, setSelectedComplexity] = useState<StoryComplexity | undefined>(STORY_COMPLEXITIES[1].value);
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
 
+  useEffect(() => {
+    if (selectedGenre) {
+      setAvailableSubGenres(SUBGENRES_MAP[selectedGenre] || []);
+      setSelectedSubGenre(undefined); // Reset subgenre when main genre changes
+    } else {
+      setAvailableSubGenres([]);
+      setSelectedSubGenre(undefined);
+    }
+  }, [selectedGenre]);
+
   const handleGenerateStory = () => {
     if (!selectedGenre) {
-      toast({ variant: 'destructive', title: 'Hata', description: 'Lütfen bir tür seçin.' });
+      toast({ variant: 'destructive', title: 'Hata', description: 'Lütfen bir ana tür seçin.' });
       return;
     }
-    // Length and complexity are optional, but we have defaults.
-    // If we didn't want defaults, we would check if they are undefined.
 
     startTransition(async () => {
       toast({ title: "Hikaye Oluşturuluyor...", description: "Yapay zeka yeni bir masal hazırlıyor, lütfen bekleyin."});
-      const result = await generateNewStoryAction(selectedGenre, selectedLength, selectedComplexity);
-      if (result.success && result.storyData) { // Check for storyData as well
+      // Pass subGenre to the action
+      const result = await generateNewStoryAction(selectedGenre, selectedLength, selectedComplexity, selectedSubGenre);
+      if (result.success && result.storyData) {
         toast({ title: 'Hikaye Oluşturuldu!', description: `"${result.storyData.title}" oluşturuldu ve incelenmeyi bekliyor.` });
-        onStoryGenerated(); // Notify parent to refresh
-        setSelectedGenre(undefined); // Reset genre selection
-        // Optionally reset length and complexity or keep them for next generation
+        onStoryGenerated();
+        setSelectedGenre(undefined);
+        // setSelectedSubGenre(undefined); // Already reset by useEffect on genre change
         // setSelectedLength(STORY_LENGTHS[1].value);
         // setSelectedComplexity(STORY_COMPLEXITIES[1].value);
       } else {
@@ -51,18 +70,37 @@ export function GenerateStorySection({ onStoryGenerated }: GenerateStorySectionP
     <Card className="shadow-lg">
       <CardHeader>
         <CardTitle className="text-2xl">Yeni Hikaye Oluştur</CardTitle>
-        <CardDescription>Bir tür, uzunluk ve detay seviyesi seçin ve yapay zekanın yeni bir masal örmesine izin verin.</CardDescription>
+        <CardDescription>Bir tür, alt tür, uzunluk ve detay seviyesi seçin ve yapay zekanın yeni bir masal örmesine izin verin.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
-            <Label htmlFor="genre-select" className="text-sm font-medium text-muted-foreground block mb-1">Tür</Label>
+            <Label htmlFor="genre-select" className="text-sm font-medium text-muted-foreground block mb-1">Ana Tür</Label>
             <Select value={selectedGenre} onValueChange={(value) => setSelectedGenre(value as StoryGenre)} disabled={isPending}>
               <SelectTrigger id="genre-select">
-                <SelectValue placeholder="Bir tür seçin..." />
+                <SelectValue placeholder="Ana tür seçin..." />
               </SelectTrigger>
               <SelectContent>
                 {GENRES.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="subgenre-select" className="text-sm font-medium text-muted-foreground block mb-1">Alt Tür</Label>
+            <Select 
+              value={selectedSubGenre} 
+              onValueChange={(value) => setSelectedSubGenre(value as StorySubGenre)} 
+              disabled={isPending || !selectedGenre || availableSubGenres.length === 0}
+            >
+              <SelectTrigger id="subgenre-select">
+                <SelectValue placeholder={selectedGenre ? "Alt tür seçin (isteğe bağlı)..." : "Önce ana tür seçin..."} />
+              </SelectTrigger>
+              <SelectContent>
+                {availableSubGenres.length > 0 ? (
+                  availableSubGenres.map(sg => <SelectItem key={sg.value} value={sg.value}>{sg.label}</SelectItem>)
+                ) : (
+                  <SelectItem value="no-subgenre" disabled>Bu tür için alt tür yok</SelectItem>
+                )}
               </SelectContent>
             </Select>
           </div>

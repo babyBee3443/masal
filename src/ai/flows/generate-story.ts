@@ -12,11 +12,13 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import type { StoryLength, StoryComplexity } from '@/lib/constants';
+import type { StorySubGenre } from '@/lib/types'; // StorySubGenre tipini import et
 
 const GenerateStoryInputSchema = z.object({
   genre: z
     .string()
     .describe("Üretilecek hikayenin türü (örn. Korku, Macera, Romantik, Bilim Kurgu, Fabl, Felsefi)."),
+  subGenre: z.string().optional().describe("Belirtilmişse, hikayenin daha spesifik alt türü (örn. Keşif ve Yolculuk, Hayalet Hikayeleri)."), // Yeni alan
   length: z.string().optional().describe("İstenen hikaye uzunluğu (örn. kısa, orta, uzun). Boş bırakılırsa model varsayılan uzunluğu kullanır."),
   complexity: z.string().optional().describe("İstenen hikaye karmaşıklığı ve detay seviyesi (örn. basit, orta, detaylı). Boş bırakılırsa model varsayılan karmaşıklığı kullanır."),
 });
@@ -30,13 +32,12 @@ const StoryTextOutputSchema = z.object({
 type StoryTextOutput = z.infer<typeof StoryTextOutputSchema>;
 
 // Schema for the final output of the flow, including the image URL
-// NOT EXPORTED as a const value from 'use server' file
 const GenerateStoryOutputSchemaInternal = z.object({
   title: z.string().describe("Üretilen hikayenin başlığı."),
   content: z.string().describe("Üretilen hikayenin tam metin içeriği."),
   imageUrl: z.string().describe("Üretilen görseli içeren bir data URI. Beklenen format: 'data:<mimetype>;base64,<encoded_data>'"),
 });
-export type GenerateStoryOutput = z.infer<typeof GenerateStoryOutputSchemaInternal>; // Type export is fine
+export type GenerateStoryOutput = z.infer<typeof GenerateStoryOutputSchemaInternal>;
 
 // This is the only function that should be exported for use by server actions or components.
 export async function generateStory(input: GenerateStoryInput): Promise<GenerateStoryOutput> {
@@ -47,7 +48,11 @@ const generateStoryPrompt = ai.definePrompt({
   name: 'generateStoryPrompt',
   input: {schema: GenerateStoryInputSchema},
   output: {schema: StoryTextOutputSchema},
-  prompt: `Yaratıcı bir hikaye yazarısın. Aşağıdaki türde bir hikaye yaz: {{{genre}}}.
+  prompt: `Yaratıcı bir hikaye yazarısın.
+Aşağıdaki ana türde bir hikaye yaz: {{{genre}}}.
+{{#if subGenre}}
+Hikayenin alt türü: "{{subGenre}}" olmalıdır. Lütfen bu alt türe uygun öğeler ve temalar kullan.
+{{/if}}
 {{#if length}}
 Hikayenin uzunluğu yaklaşık olarak "{{length}}" olmalıdır.
 {{else}}
@@ -108,10 +113,9 @@ const generateStoryFlow = ai.defineFlow(
   {
     name: 'generateStoryFlow',
     inputSchema: GenerateStoryInputSchema,
-    outputSchema: GenerateStoryOutputSchemaInternal, // Final output schema for the flow
+    outputSchema: GenerateStoryOutputSchemaInternal,
   },
   async input => {
-    // Generate story text (title and content)
     const storyTextResult = await generateStoryPrompt(input);
 
     if (!storyTextResult.output || !storyTextResult.output.title || !storyTextResult.output.content) {
@@ -120,8 +124,7 @@ const generateStoryFlow = ai.defineFlow(
 
     const { title, content } = storyTextResult.output;
 
-    // Generate image based on the story title/content
-    const imagePrompt = `"${title}" başlıklı masal için fantastik ve masalsı bir illüstrasyon oluştur. Masalın konusu: ${content.substring(0, 200)}...\n\nÖNEMLİ: Lütfen oluşturulan görselde HİÇBİR yazı, harf veya kelime KULLANMA. Sadece görsel öğeler olsun.`;
+    const imagePrompt = `"${title}" başlıklı, "${input.genre}" ana türünde ve {{#if input.subGenre}}"${input.subGenre}" alt türünde{{/if}} olan masal için fantastik ve masalsı bir illüstrasyon oluştur. Masalın konusu: ${content.substring(0, 200)}...\n\nÖNEMLİ: Lütfen oluşturulan görselde HİÇBİR yazı, harf veya kelime KULLANMA. Sadece görsel öğeler olsun.`;
     
     const {media} = await ai.generate({
       model: 'googleai/gemini-2.0-flash-exp',
@@ -142,4 +145,3 @@ const generateStoryFlow = ai.defineFlow(
     };
   }
 );
-

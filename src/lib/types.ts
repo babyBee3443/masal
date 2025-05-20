@@ -1,5 +1,7 @@
 
 export type StoryGenre = "Korku" | "Macera" | "Romantik" | "Bilim Kurgu" | "Fabl" | "Felsefi";
+export type StorySubGenre = string; // Alt kategoriler dinamik olabileceği için string olarak bırakıldı.
+                                 // Daha katı bir yapı istenirse, her ana kategori için ayrı alt kategori türleri tanımlanabilir.
 
 export interface Story {
   id: string;
@@ -8,7 +10,8 @@ export interface Story {
   summary: string;
   imageUrl: string;
   genre: StoryGenre;
-  status: 'awaiting_approval' | 'pending' | 'published'; // Added 'awaiting_approval'
+  subGenre?: StorySubGenre; // Yeni alan: Alt Kategori
+  status: 'awaiting_approval' | 'pending' | 'published';
   createdAt: string; // ISO date string
   publishedAt?: string; // ISO date string
   scheduledAtDate?: string; // YYYY-MM-DD for publication scheduling
@@ -39,4 +42,3 @@ export interface WeeklyScheduleItem {
   createdAt: string; // ISO date string
   updatedAt: string; // ISO date string
 }
-

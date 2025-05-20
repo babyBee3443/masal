@@ -51,8 +51,7 @@ export function Header() {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [isCategoriesMenuOpen, setIsCategoriesMenuOpen] = useState(false);
-  const categoriesMenuTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Removed hover-related state: isCategoriesMenuOpen, categoriesMenuTimeoutRef
 
   useEffect(() => {
     const handleScroll = () => {
@@ -62,22 +61,7 @@ export function Header() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const openCategoriesMenu = () => {
-    if (categoriesMenuTimeoutRef.current) {
-      clearTimeout(categoriesMenuTimeoutRef.current);
-      categoriesMenuTimeoutRef.current = null;
-    }
-    setIsCategoriesMenuOpen(true);
-  };
-
-  const closeCategoriesMenuWithDelay = () => {
-    if (categoriesMenuTimeoutRef.current) {
-      clearTimeout(categoriesMenuTimeoutRef.current);
-    }
-    categoriesMenuTimeoutRef.current = setTimeout(() => {
-      setIsCategoriesMenuOpen(false);
-    }, 300); // 300ms delay
-  };
+  // Removed hover-related functions: openCategoriesMenu, closeCategoriesMenuWithDelay
 
   const NavLinkItem = ({ href, label, icon: Icon, exact = false }: { href: string; label: string; icon: React.ElementType; exact?: boolean}) => {
     const isActive = exact ? pathname === href : pathname.startsWith(href);
@@ -130,17 +114,15 @@ export function Header() {
             </Link>
           </Button>
 
-          <DropdownMenu open={isCategoriesMenuOpen} onOpenChange={setIsCategoriesMenuOpen}>
+          <DropdownMenu> {/* Removed open and onOpenChange props for hover behavior */}
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
                 className={cn(
                   "text-sm font-medium transition-colors hover:text-primary px-3 py-2",
-                  (pathname.startsWith('/categories') || isCategoriesMenuOpen) ? "text-primary" : "text-foreground/70"
+                  pathname.startsWith('/categories') ? "text-primary" : "text-foreground/70"
                 )}
-                onMouseEnter={openCategoriesMenu}
-                onMouseLeave={closeCategoriesMenuWithDelay}
-                // onClick={() => setIsCategoriesMenuOpen(prev => !prev)} // Removed this direct onClick
+                // Removed onMouseEnter, onMouseLeave event handlers
               >
                 <LayoutGrid className="mr-2 h-4 w-4" />
                 Kategoriler
@@ -149,8 +131,7 @@ export function Header() {
             <DropdownMenuContent
               className="w-[680px] p-4 bg-card shadow-xl rounded-lg border"
               sideOffset={10}
-              onMouseEnter={openCategoriesMenu}
-              onMouseLeave={closeCategoriesMenuWithDelay}
+              // Removed onMouseEnter, onMouseLeave event handlers
             >
               <div className="grid grid-cols-3 gap-x-6">
                 {/* Column 1: DüşBox Kategorileri */}
@@ -247,7 +228,7 @@ export function Header() {
                 <Link href="/" onClick={() => setIsMobileMenuOpen(false)}>
                   <Logo className="h-8 w-auto" />
                 </Link>
-                <SheetTitle className="sr-only">Ana Menü</SheetTitle>
+                <SheetTitle className="sr-only">Ana Menü</SheetTitle> {/* Added sr-only for accessibility */}
                 <SheetClose asChild>
                   <Button variant="ghost" size="icon">
                     <X className="h-6 w-6" />

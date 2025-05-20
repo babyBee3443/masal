@@ -15,23 +15,27 @@ interface MailOptions {
 }
 
 export async function sendApprovalEmail(storyId: string, storyTitle: string, storyContentSnippet: string): Promise<boolean> {
-  const mailTo = process.env.EMAIL_TO;
+  const adminRecipientEmail = process.env.EMAIL_TO; // Yönetici e-posta adresi .env'den okunuyor
   const mailUser = process.env.EMAIL_USER;
   const mailPass = process.env.EMAIL_APP_PASSWORD;
-  const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:9002'; // Fallback for local dev
+  const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:9002';
 
-  if (!mailTo || !mailUser || !mailPass) {
-    console.error('Email credentials (EMAIL_USER, EMAIL_APP_PASSWORD) or recipient (EMAIL_TO) not found in .env file. Skipping email.');
+  if (!adminRecipientEmail) {
+    console.error('Admin recipient email (EMAIL_TO) not found in .env file. Skipping email.');
+    return false;
+  }
+  if (!mailUser || !mailPass) {
+    console.error('Email credentials (EMAIL_USER, EMAIL_APP_PASSWORD) not found in .env file. Skipping email.');
     return false;
   }
 
-  console.log(`Attempting to send email from ${mailUser} to ${mailTo} for story ID: ${storyId}`);
+  console.log(`Attempting to send approval email from ${mailUser} to ${adminRecipientEmail} for story ID: ${storyId}`);
 
   const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
       user: mailUser,
-      pass: mailPass, // Use the App Password here
+      pass: mailPass,
     },
   });
 
@@ -40,59 +44,62 @@ export async function sendApprovalEmail(storyId: string, storyTitle: string, sto
   const adminPanelUrl = `${appBaseUrl}/admin`;
 
   const mailOptions: MailOptions = {
-    from: `"DüşBox Bildirimleri" <${mailUser}>`, // Sender address
-    to: mailTo, // List of receivers
-    subject: `Yeni Masal Onay Bekliyor: ${storyTitle}`, // Subject line
+    from: `"DüşBox Bildirimleri" <${mailUser}>`,
+    to: adminRecipientEmail, // Alıcı olarak .env'den okunan adres kullanılıyor
+    subject: `Yeni Masal Onay Bekliyor: ${storyTitle}`,
     html: `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px;">
-        <h1 style="color: #4A5568; text-align: center;">Yeni Bir Masal Onayınızı Bekliyor!</h1>
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px; background-color: #f9f9f9;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h1 style="color: #8A2BE2; font-size: 24px;">Yeni Bir Düş Onayınızı Bekliyor!</h1>
+        </div>
         <p>Merhaba,</p>
-        <p>"DüşBox" için yeni bir hikaye üretildi ve onayınızı bekliyor:</p>
-        <br>
-        <p><strong>Başlık:</strong> ${storyTitle}</p>
-        <p><strong>İçerik (Önizleme):</strong></p>
-        <div style="padding: 15px; border: 1px solid #e2e8f0; background-color: #f7fafc; border-radius: 8px; margin-bottom: 20px; max-height: 200px; overflow-y: auto;">
-          <p style="margin: 0;">${storyContentSnippet.substring(0, 800)}${storyContentSnippet.length > 800 ? '...' : ''}</p>
+        <p>"DüşBox" platformunda yeni bir masal üretildi ve sizin onayınızı bekliyor:</p>
+        <div style="background-color: #ffffff; padding: 20px; border-radius: 8px; margin-top: 15px; margin-bottom: 20px; border: 1px solid #eee;">
+          <h3 style="color: #4A4A4A; margin-top: 0;">${storyTitle}</h3>
+          <p style="font-size: 0.9em; color: #555; max-height: 150px; overflow-y: auto; border-left: 3px solid #8A2BE2; padding-left: 10px;">
+            ${storyContentSnippet.substring(0, 500)}${storyContentSnippet.length > 500 ? '...' : ''}
+          </p>
         </div>
         
-        <p>Bu masalı e-posta üzerinden hızlıca yönetebilir veya detaylı inceleme için yönetici panelini ziyaret edebilirsiniz:</p>
+        <p>Aşağıdaki butonları kullanarak bu masalı yönetebilir veya detaylı inceleme için yönetici panelini ziyaret edebilirsiniz:</p>
         
         <table width="100%" cellspacing="0" cellpadding="0" style="margin-top: 25px; margin-bottom: 25px;">
           <tr>
-            <td align="center">
-              <a href="${approvalUrl}" target="_blank" style="background-color: #4CAF50; color: white; padding: 12px 25px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; font-size: 16px; font-weight: bold; margin: 5px;">
-                E-postadan Onayla
+            <td align="center" style="padding: 5px;">
+              <a href="${approvalUrl}" target="_blank" style="background-color: #5cb85c; color: white; padding: 12px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; font-size: 15px; font-weight: bold; min-width: 120px;">
+                Onayla
               </a>
-              <a href="${rejectionUrl}" target="_blank" style="background-color: #f44336; color: white; padding: 12px 25px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; font-size: 16px; font-weight: bold; margin: 5px;">
-                E-postadan Reddet
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding: 5px;">
+              <a href="${rejectionUrl}" target="_blank" style="background-color: #d9534f; color: white; padding: 12px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; font-size: 15px; font-weight: bold; min-width: 120px;">
+                Reddet
               </a>
             </td>
           </tr>
            <tr>
-            <td align="center" style="padding-top: 15px;">
-              <a href="${adminPanelUrl}" target="_blank" style="background-color: #007bff; color: white; padding: 12px 25px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; font-size: 16px; font-weight: bold; margin: 5px;">
-                Yönetici Paneline Git
+            <td align="center" style="padding: 15px 5px 5px 5px;">
+              <a href="${adminPanelUrl}" target="_blank" style="background-color: #007bff; color: white; padding: 12px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; font-size: 15px; font-weight: bold; min-width: 120px;">
+                Yönetici Paneli
               </a>
             </td>
           </tr>
         </table>
 
         <p style="font-size: 0.9em; color: #718096; text-align: center;"><em>(E-postadan yapılan onay/reddetme işlemleri doğrudan uygulanır. Detaylı düzenleme için lütfen yönetici panelini kullanın.)</em></p>
-        <br>
-        <p>Teşekkürler,</p>
-        <p>DüşBox Ekibi</p>
-        <br>
-        <p style="font-size: 0.8em; color: #a0aec0; text-align: center;"><em>(Bu e-posta otomatik olarak gönderilmiştir. Lütfen bu adrese yanıt vermeyiniz.)</em></p>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+        <p style="font-size: 0.8em; color: #a0aec0; text-align: center;">DüşBox Ekibi<br><em>Bu e-posta otomatik olarak gönderilmiştir. Lütfen yanıtlamayınız.</em></p>
       </div>
-    `, // html body
+    `,
   };
 
   try {
     const info = await transporter.sendMail(mailOptions);
-    console.log(`Approval email sent to ${mailTo} for story ID ${storyId}, title "${storyTitle}". Message ID: ${info.messageId}`);
+    console.log(`Approval email sent to ${adminRecipientEmail} for story ID ${storyId}, title "${storyTitle}". Message ID: ${info.messageId}`);
     return true;
   } catch (error) {
-    console.error(`Error sending approval email for story ID ${storyId}, title "${storyTitle}":`, error);
+    console.error(`Error sending approval email for story ID ${storyId}, title "${storyTitle}" to ${adminRecipientEmail}:`, error);
     if (error instanceof Error && 'responseCode' in error) {
         // @ts-ignore
         console.error('Nodemailer response code:', error.responseCode);

@@ -12,8 +12,7 @@ import { randomUUID } from 'crypto'; // For generating unique IDs
 // Server actions are now primarily for:
 // 1. AI interactions (which must run server-side).
 // 2. Data validation/preparation before client handles localStorage.
-// 3. Reading data if a server component needs it (though prefer client for localStorage consistency).
-// 4. Triggering side effects like sending emails.
+// 3. Triggering side effects like sending emails.
 
 export async function publishStoryAction(storyId: string) {
   console.warn("[Action] publishStoryAction: Client should handle localStorage update. This action now only returns data for the client to act upon.");
@@ -55,7 +54,8 @@ export async function generateNewStoryAction(
   genre: StoryGenre, 
   length?: StoryLength, 
   complexity?: StoryComplexity,
-  subGenre?: StorySubGenre
+  subGenre?: StorySubGenre,
+  // adminRecipientEmail?: string // Future: Client can pass recipient from localStorage settings
 ): Promise<{ success: boolean; storyData?: Omit<Story, 'summary' | 'createdAt'> & {id: string} ; error?: string }> {
   try {
     console.log(`[Action] generateNewStoryAction: Generating story for genre: ${genre}, subGenre: ${subGenre}, length: ${length}, complexity: ${complexity}`);
@@ -71,7 +71,7 @@ export async function generateNewStoryAction(
       throw new Error(specificError);
     }
     
-    const storyId = randomUUID(); // Generate a unique ID on the server
+    const storyId = randomUUID(); 
 
     const newStoryData: Omit<Story, 'summary' | 'createdAt'> & { id: string } = {
       id: storyId, 
@@ -84,8 +84,8 @@ export async function generateNewStoryAction(
     };
     console.log(`[Action] generateNewStoryAction: Story data prepared successfully. ID: ${storyId}, Genre: ${genre}, SubGenre: ${subGenre}, Status: 'awaiting_approval'`);
     
-    // Send approval email
-    const emailSent = await sendApprovalEmail(newStoryData.id, newStoryData.title, newStoryData.content);
+    // Send approval email - recipient will be taken from .env by default if not passed as param
+    const emailSent = await sendApprovalEmail(newStoryData.id, newStoryData.title, newStoryData.content /*, adminRecipientEmail */);
     if (emailSent) {
       console.log(`[Action] generateNewStoryAction: Approval email successfully queued for "${newStoryData.title}" (ID: ${newStoryData.id}).`);
     } else {
@@ -181,7 +181,14 @@ export async function processScheduledGenerationAction(id: string, genre: StoryG
   console.log(`[Action] processScheduledGenerationAction: Processing scheduled generation ID: ${id} for Genre: ${genre}`);
   
   try {
-    const generationResult = await generateNewStoryAction(genre, undefined, undefined, undefined); 
+    // The 'genre' is now passed from the client, so we use it directly.
+    // const scheduledItem = await dbGetScheduledGenerationById(id); // No longer needed on server
+    // if (!scheduledItem) {
+    //   console.error(`[Action] processScheduledGenerationAction: Scheduled generation not found (server read): ${id}`);
+    //   return { success: false, error: `Planlanmış üretim bulunamadı (sunucu okuma): ${id}`, scheduledGenerationId: id };
+    // }
+
+    const generationResult = await generateNewStoryAction(genre, undefined, undefined, undefined /*, adminRecipientEmail - future */); 
 
     if (generationResult.success && generationResult.storyData) {
       console.log(`[Action] processScheduledGenerationAction: Story generated successfully by AI for scheduled ID: ${id}, Genre: ${genre}. Story title: "${generationResult.storyData.title}", Story ID: ${generationResult.storyData.id}`);
@@ -231,6 +238,8 @@ export async function saveWeeklyScheduleSlotAction(
 }> {
   console.log(`[Action] saveWeeklyScheduleSlotAction: Server action received day: ${dayOfWeek}, time: ${time}, genre: ${genre}. Preparing data for client to update localStorage.`);
   try {
+    if (genre === "" || genre === undefined) genre = null; // Treat empty string or undefined as clearing the slot
+
     if (genre && !["Korku", "Macera", "Romantik", "Bilim Kurgu", "Fabl", "Felsefi"].includes(genre)) {
         console.error("[Action] saveWeeklyScheduleSlotAction: Invalid genre provided:", genre);
         return { success: false, error: "Geçersiz tür." };

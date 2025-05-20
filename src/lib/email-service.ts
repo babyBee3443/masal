@@ -14,14 +14,21 @@ interface MailOptions {
   html: string;
 }
 
-export async function sendApprovalEmail(storyId: string, storyTitle: string, storyContentSnippet: string): Promise<boolean> {
-  const adminRecipientEmail = process.env.EMAIL_TO; // Yönetici e-posta adresi .env'den okunuyor
+export async function sendApprovalEmail(
+  storyId: string, 
+  storyTitle: string, 
+  storyContentSnippet: string,
+  recipientEmail?: string // New optional parameter for dynamic recipient
+): Promise<boolean> {
   const mailUser = process.env.EMAIL_USER;
   const mailPass = process.env.EMAIL_APP_PASSWORD;
   const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:9002';
 
-  if (!adminRecipientEmail) {
-    console.error('Admin recipient email (EMAIL_TO) not found in .env file. Skipping email.');
+  // Determine the recipient email
+  const emailToSendTo = recipientEmail || process.env.EMAIL_TO;
+
+  if (!emailToSendTo) {
+    console.error('Recipient email (recipientEmail parameter or EMAIL_TO in .env) not found. Skipping email.');
     return false;
   }
   if (!mailUser || !mailPass) {
@@ -29,7 +36,7 @@ export async function sendApprovalEmail(storyId: string, storyTitle: string, sto
     return false;
   }
 
-  console.log(`Attempting to send approval email from ${mailUser} to ${adminRecipientEmail} for story ID: ${storyId}`);
+  console.log(`Attempting to send approval email from ${mailUser} to ${emailToSendTo} for story ID: ${storyId}`);
 
   const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -45,7 +52,7 @@ export async function sendApprovalEmail(storyId: string, storyTitle: string, sto
 
   const mailOptions: MailOptions = {
     from: `"DüşBox Bildirimleri" <${mailUser}>`,
-    to: adminRecipientEmail, // Alıcı olarak .env'den okunan adres kullanılıyor
+    to: emailToSendTo, // Use the determined recipient
     subject: `Yeni Masal Onay Bekliyor: ${storyTitle}`,
     html: `
       <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px; background-color: #f9f9f9;">
@@ -61,33 +68,33 @@ export async function sendApprovalEmail(storyId: string, storyTitle: string, sto
           </p>
         </div>
         
-        <p>Aşağıdaki butonları kullanarak bu masalı yönetebilir veya detaylı inceleme için yönetici panelini ziyaret edebilirsiniz:</p>
+        <p>Aşağıdaki butonları kullanarak bu masalı yönetici panelinden onaylayabilir veya reddedebilirsiniz:</p>
         
         <table width="100%" cellspacing="0" cellpadding="0" style="margin-top: 25px; margin-bottom: 25px;">
           <tr>
             <td align="center" style="padding: 5px;">
               <a href="${approvalUrl}" target="_blank" style="background-color: #5cb85c; color: white; padding: 12px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; font-size: 15px; font-weight: bold; min-width: 120px;">
-                Onayla
+                Panelde Onayla
               </a>
             </td>
           </tr>
           <tr>
             <td align="center" style="padding: 5px;">
               <a href="${rejectionUrl}" target="_blank" style="background-color: #d9534f; color: white; padding: 12px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; font-size: 15px; font-weight: bold; min-width: 120px;">
-                Reddet
+                Panelde Reddet/Düzenle
               </a>
             </td>
           </tr>
            <tr>
             <td align="center" style="padding: 15px 5px 5px 5px;">
               <a href="${adminPanelUrl}" target="_blank" style="background-color: #007bff; color: white; padding: 12px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; font-size: 15px; font-weight: bold; min-width: 120px;">
-                Yönetici Paneli
+                Yönetici Paneline Git
               </a>
             </td>
           </tr>
         </table>
 
-        <p style="font-size: 0.9em; color: #718096; text-align: center;"><em>(E-postadan yapılan onay/reddetme işlemleri doğrudan uygulanır. Detaylı düzenleme için lütfen yönetici panelini kullanın.)</em></p>
+        <p style="font-size: 0.9em; color: #718096; text-align: center;"><em>(E-postadan yapılan onay/reddetme işlemleri sizi yönetici paneline yönlendirecektir. Asıl işlem panel üzerinden tamamlanmalıdır.)</em></p>
         <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
         <p style="font-size: 0.8em; color: #a0aec0; text-align: center;">DüşBox Ekibi<br><em>Bu e-posta otomatik olarak gönderilmiştir. Lütfen yanıtlamayınız.</em></p>
       </div>
@@ -96,10 +103,10 @@ export async function sendApprovalEmail(storyId: string, storyTitle: string, sto
 
   try {
     const info = await transporter.sendMail(mailOptions);
-    console.log(`Approval email sent to ${adminRecipientEmail} for story ID ${storyId}, title "${storyTitle}". Message ID: ${info.messageId}`);
+    console.log(`Approval email sent to ${emailToSendTo} for story ID ${storyId}, title "${storyTitle}". Message ID: ${info.messageId}`);
     return true;
   } catch (error) {
-    console.error(`Error sending approval email for story ID ${storyId}, title "${storyTitle}" to ${adminRecipientEmail}:`, error);
+    console.error(`Error sending approval email for story ID ${storyId}, title "${storyTitle}" to ${emailToSendTo}:`, error);
     if (error instanceof Error && 'responseCode' in error) {
         // @ts-ignore
         console.error('Nodemailer response code:', error.responseCode);

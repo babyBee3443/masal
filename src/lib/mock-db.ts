@@ -2,10 +2,11 @@
 import type { Story, StoryGenre, ScheduledGeneration, ScheduledGenerationStatus, WeeklyScheduleItem, DayOfWeek } from '@/lib/types';
 import { isValid, parseISO, format } from 'date-fns'; // Added format and isValid for direct use here
 
-const STORIES_KEY = 'dusbox_stories'; // Updated key prefix
-const SCHEDULED_GENERATIONS_KEY = 'dusbox_scheduledGenerations'; // Updated key prefix
-const WEEKLY_SCHEDULES_KEY = 'dusbox_weeklySchedules'; // Updated key prefix
-const LAST_WEEKLY_CHECK_KEY = 'dusbox_lastWeeklyCheck'; // Updated key prefix
+const STORIES_KEY = 'dusbox_stories';
+const SCHEDULED_GENERATIONS_KEY = 'dusbox_scheduledGenerations';
+const WEEKLY_SCHEDULES_KEY = 'dusbox_weeklySchedules';
+const LAST_WEEKLY_CHECK_KEY = 'dusbox_lastWeeklyCheck';
+const ADMIN_RECIPIENT_EMAIL_KEY = 'dusbox_adminRecipientEmail'; // New key for admin email
 
 // Helper to generate summary
 const generateSummary = (content: string, wordCount: number = 30): string => {
@@ -87,7 +88,6 @@ const saveToLocalStorage = <T>(key: string, value: T): void => {
 export const getStories = async (): Promise<Story[]> => {
   const stories = getFromLocalStorage<Story[]>(STORIES_KEY, []);
   if (stories.length === 0 && typeof window !== 'undefined' && !window.localStorage.getItem(STORIES_KEY)) {
-      // Initialize localStorage if it's empty and we want to start with initial data
       saveToLocalStorage(STORIES_KEY, initialStoriesData);
       return JSON.parse(JSON.stringify(initialStoriesData));
   }
@@ -95,29 +95,24 @@ export const getStories = async (): Promise<Story[]> => {
 };
 
 export const getStoryById = async (id: string): Promise<Story | undefined> => {
-  const stories = await getStories(); // Ensure localStorage is initialized if needed
+  const stories = await getStories(); 
   const story = stories.find(s => s.id === id);
   return story ? JSON.parse(JSON.stringify(story)) : undefined;
 };
 
-export const addStory = async (storyData: Omit<Story, 'summary' | 'createdAt'> & { id: string; status?: Story['status'] }): Promise<Story> => {
-  let stories = await getStories(); // Ensure stories are loaded/initialized
-  const newStory: Story = {
-    id: storyData.id, // Use the ID from storyData
-    title: storyData.title,
-    content: storyData.content,
-    imageUrl: storyData.imageUrl,
-    genre: storyData.genre,
-    subGenre: storyData.subGenre,
+export const addStory = async (storyData: Story): Promise<Story> => {
+  let stories = await getStories();
+  // Ensure summary is generated if not provided or content changed
+  const newStoryWithSummary = {
+    ...storyData,
     summary: generateSummary(storyData.content),
-    createdAt: new Date().toISOString(),
-    status: storyData.status || 'awaiting_approval',
   };
-  stories.unshift(newStory);
+  stories.unshift(newStoryWithSummary);
   saveToLocalStorage(STORIES_KEY, stories);
-  console.log('[DB AddStory] Added story:', newStory.id, 'Status:', newStory.status);
-  return JSON.parse(JSON.stringify(newStory));
+  console.log('[DB AddStory] Added story:', newStoryWithSummary.id, 'Status:', newStoryWithSummary.status);
+  return JSON.parse(JSON.stringify(newStoryWithSummary));
 };
+
 
 export const updateStory = async (id: string, updates: Partial<Omit<Story, 'id'>>): Promise<Story | undefined> => {
   let stories = await getStories();
@@ -286,6 +281,16 @@ export const setLastWeeklyCheckTime = async (time: string): Promise<void> => {
     saveToLocalStorage(LAST_WEEKLY_CHECK_KEY, time);
 }
 
+// Admin Recipient Email for Notifications
+export const getAdminRecipientEmail = async (): Promise<string | null> => {
+  return getFromLocalStorage<string | null>(ADMIN_RECIPIENT_EMAIL_KEY, null);
+}
+
+export const setAdminRecipientEmail = async (email: string): Promise<void> => {
+  saveToLocalStorage(ADMIN_RECIPIENT_EMAIL_KEY, email);
+}
+
+
 // Function to ensure initial data is in localStorage
 export const initializeDb = async () => {
   if (typeof window !== 'undefined') {
@@ -304,6 +309,10 @@ export const initializeDb = async () => {
      if (!window.localStorage.getItem(LAST_WEEKLY_CHECK_KEY)) {
       console.log('Initializing last weekly check time in localStorage.');
       saveToLocalStorage(LAST_WEEKLY_CHECK_KEY, null);
+    }
+    if (!window.localStorage.getItem(ADMIN_RECIPIENT_EMAIL_KEY)) {
+      console.log('Initializing admin recipient email in localStorage.');
+      saveToLocalStorage(ADMIN_RECIPIENT_EMAIL_KEY, null); // Initialize as null
     }
   }
 };

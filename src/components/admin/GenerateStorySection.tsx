@@ -16,11 +16,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { generateNewStoryAction } from '@/lib/actions';
+import { getAdminRecipientEmail } from '@/lib/mock-db'; // Import to get recipient email
 import { Sparkles, Loader2 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 
 interface GenerateStorySectionProps {
-  onStoryGenerated: () => void; // Callback to inform parent to refresh list
+  onStoryGenerated: () => void; 
 }
 
 export function GenerateStorySection({ onStoryGenerated }: GenerateStorySectionProps) {
@@ -36,14 +37,14 @@ export function GenerateStorySection({ onStoryGenerated }: GenerateStorySectionP
   useEffect(() => {
     if (selectedGenre) {
       setAvailableSubGenres(SUBGENRES_MAP[selectedGenre] || []);
-      setSelectedSubGenre(undefined); // Reset subgenre when main genre changes
+      setSelectedSubGenre(undefined); 
     } else {
       setAvailableSubGenres([]);
       setSelectedSubGenre(undefined);
     }
   }, [selectedGenre]);
 
-  const handleGenerateStory = () => {
+  const handleGenerateStory = async () => {
     if (!selectedGenre) {
       toast({ variant: 'destructive', title: 'Hata', description: 'Lütfen bir ana tür seçin.' });
       return;
@@ -51,15 +52,20 @@ export function GenerateStorySection({ onStoryGenerated }: GenerateStorySectionP
 
     startTransition(async () => {
       toast({ title: "Hikaye Oluşturuluyor...", description: "Yapay zeka yeni bir masal hazırlıyor, lütfen bekleyin."});
-      // Pass subGenre to the action
-      const result = await generateNewStoryAction(selectedGenre, selectedLength, selectedComplexity, selectedSubGenre);
+      
+      const adminEmail = await getAdminRecipientEmail(); // Get email from localStorage
+      
+      const result = await generateNewStoryAction(
+        selectedGenre, 
+        selectedLength, 
+        selectedComplexity, 
+        selectedSubGenre,
+        adminEmail || undefined // Pass email or undefined
+      );
       if (result.success && result.storyData) {
         toast({ title: 'Hikaye Oluşturuldu!', description: `"${result.storyData.title}" oluşturuldu ve incelenmeyi bekliyor.` });
         onStoryGenerated();
         setSelectedGenre(undefined);
-        // setSelectedSubGenre(undefined); // Already reset by useEffect on genre change
-        // setSelectedLength(STORY_LENGTHS[1].value);
-        // setSelectedComplexity(STORY_COMPLEXITIES[1].value);
       } else {
         toast({ variant: 'destructive', title: 'Oluşturma Başarısız', description: result.error || 'Hikaye oluşturulamadı.' });
       }

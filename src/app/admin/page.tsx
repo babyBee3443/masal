@@ -5,15 +5,18 @@
 import { useEffect, useState, useTransition } from 'react';
 import Link from 'next/link';
 import type { Story } from '@/lib/types';
-import { getStories, updateStory as dbUpdateStory } from '@/lib/mock-db'; 
+import { getStories, updateStory as dbUpdateStory, getAdminRecipientEmail, setAdminRecipientEmail } from '@/lib/mock-db'; 
 import { AdminStoryControls } from '@/components/admin/AdminStoryControls';
 import { GenerateStorySection } from '@/components/admin/GenerateStorySection';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, AlertTriangle, Inbox, CalendarCog, Repeat, Info, CheckCircle, ShieldQuestion } from 'lucide-react';
+import { Loader2, AlertTriangle, Inbox, CalendarCog, Repeat, Info, CheckCircle, ShieldQuestion, Settings, Save } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { parseISO, isValid } from 'date-fns';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 export default function AdminPage() {
   const [stories, setStories] = useState<Story[]>([]);
@@ -23,15 +26,50 @@ export default function AdminPage() {
   const { toast } = useToast();
   const [autoPublicationAttempted, setAutoPublicationAttempted] = useState(false);
 
+  const [adminEmail, setAdminEmail] = useState('');
+  const [initialAdminEmail, setInitialAdminEmail] = useState('');
+  const [isSavingEmail, startEmailSaveTransition] = useTransition();
+
+  const fetchAdminEmail = async () => {
+    const email = await getAdminRecipientEmail();
+    if (email) {
+      setAdminEmail(email);
+      setInitialAdminEmail(email);
+    }
+  };
+
+  useEffect(() => {
+    fetchAdminEmail();
+  }, []);
+
+  const handleAdminEmailSave = async () => {
+    startEmailSaveTransition(async () => {
+      if (!adminEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail.trim())) {
+        toast({
+          variant: 'destructive',
+          title: 'Geçersiz E-posta',
+          description: 'Lütfen geçerli bir e-posta adresi girin.',
+        });
+        return;
+      }
+      await setAdminRecipientEmail(adminEmail.trim());
+      setInitialAdminEmail(adminEmail.trim());
+      toast({
+        title: 'E-posta Adresi Kaydedildi',
+        description: `Onay e-postaları artık ${adminEmail.trim()} adresine gönderilecek.`,
+      });
+    });
+  };
+
+
   const fetchStories = async (isManualRefresh = false) => {
-    if(!isManualRefresh && !isLoading) setIsLoading(true); // Show loading only if not already loading
+    if(!isManualRefresh && !isLoading) setIsLoading(true); 
     setError(null);
     console.log('[AdminPage Fetch] Fetching stories. ManualRefresh:', isManualRefresh);
     try {
       let fetchedStories = await getStories();
       console.log('[AdminPage Fetch] Fetched stories count:', fetchedStories.length);
       
-      // Automatic Publication Check
       if (!autoPublicationAttempted || isManualRefresh) {
         const now = new Date();
         let publishedCount = 0;
@@ -64,14 +102,14 @@ export default function AdminPage() {
           });
 
         if (storiesToUpdatePromises.length > 0) {
-          if (isManualRefresh || !autoPublicationAttempted) { // Show toast on manual refresh or first auto attempt
+          if (isManualRefresh || !autoPublicationAttempted) { 
              toast({
                 title: "Otomatik Yayın Kontrolü",
                 description: `${storiesToUpdatePromises.length} adet zamanı gelmiş hikaye yayınlanıyor...`
             });
           }
           await Promise.all(storiesToUpdatePromises);
-          fetchedStories = await getStories(); // Re-fetch after updates
+          fetchedStories = await getStories(); 
            if (publishedCount > 0 && (isManualRefresh || !autoPublicationAttempted)) { 
             toast({
                 variant: "default",
@@ -88,13 +126,11 @@ export default function AdminPage() {
       }
 
       fetchedStories.sort((a, b) => {
-        // Sort by status: awaiting_approval -> pending -> published
         const statusOrder = { 'awaiting_approval': 1, 'pending': 2, 'published': 3 };
         if (statusOrder[a.status] !== statusOrder[b.status]) {
           return statusOrder[a.status] - statusOrder[b.status];
         }
         
-        // Within 'pending', sort by scheduledAtDate (earliest first)
         if (a.status === 'pending' && b.status === 'pending') {
           if (a.scheduledAtDate && b.scheduledAtDate) {
             try {
@@ -110,7 +146,6 @@ export default function AdminPage() {
             return 1;  
           }
         }
-        // Default sort by createdAt (newest first)
         try {
             const dateA = parseISO(a.createdAt);
             const dateB = parseISO(b.createdAt);
@@ -218,6 +253,36 @@ export default function AdminPage() {
           </div>
         </div>
       </div>
+
+      <Card className="shadow-lg">
+        <CardHeader>
+          <CardTitle className="text-2xl flex items-center">
+            <Settings className="mr-3 h-7 w-7 text-primary" />
+            E-posta Bildirim Ayarları
+          </CardTitle>
+          <CardDescription>Onay e-postalarının gönderileceği yönetici e-posta adresini ayarlayın.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label htmlFor="admin-email-input" className="block mb-1 font-medium">Yönetici E-posta Adresi</Label>
+            <Input
+              id="admin-email-input"
+              type="email"
+              placeholder="ornek_yonetici@example.com"
+              value={adminEmail}
+              onChange={(e) => setAdminEmail(e.target.value)}
+              className="max-w-md"
+            />
+             <p className="text-xs text-muted-foreground mt-1">
+              Bu adrese yeni hikaye onay bildirimleri gönderilecektir. Boş bırakılırsa, `.env` dosyasındaki `EMAIL_TO` adresi kullanılır.
+            </p>
+          </div>
+          <Button onClick={handleAdminEmailSave} disabled={isSavingEmail || adminEmail === initialAdminEmail}>
+            {isSavingEmail ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+            E-posta Adresini Kaydet
+          </Button>
+        </CardContent>
+      </Card>
 
       <GenerateStorySection onStoryGenerated={handleStoryGeneratedOrUpdated} />
 

@@ -18,13 +18,13 @@ export async function sendApprovalEmail(
   storyId: string, 
   storyTitle: string, 
   storyContentSnippet: string,
-  recipientEmail?: string // New optional parameter for dynamic recipient
+  recipientEmail?: string // Optional parameter for dynamic recipient
 ): Promise<boolean> {
   const mailUser = process.env.EMAIL_USER;
   const mailPass = process.env.EMAIL_APP_PASSWORD;
   const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:9002';
 
-  // Determine the recipient email
+  // Determine the recipient email: prioritize passed parameter, then .env, then nothing.
   const emailToSendTo = recipientEmail || process.env.EMAIL_TO;
 
   if (!emailToSendTo) {
@@ -52,7 +52,7 @@ export async function sendApprovalEmail(
 
   const mailOptions: MailOptions = {
     from: `"DüşBox Bildirimleri" <${mailUser}>`,
-    to: emailToSendTo, // Use the determined recipient
+    to: emailToSendTo,
     subject: `Yeni Masal Onay Bekliyor: ${storyTitle}`,
     html: `
       <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px; background-color: #f9f9f9;">
@@ -74,14 +74,14 @@ export async function sendApprovalEmail(
           <tr>
             <td align="center" style="padding: 5px;">
               <a href="${approvalUrl}" target="_blank" style="background-color: #5cb85c; color: white; padding: 12px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; font-size: 15px; font-weight: bold; min-width: 120px;">
-                Panelde Onayla
+                E-postadan Onayla
               </a>
             </td>
           </tr>
           <tr>
             <td align="center" style="padding: 5px;">
               <a href="${rejectionUrl}" target="_blank" style="background-color: #d9534f; color: white; padding: 12px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; font-size: 15px; font-weight: bold; min-width: 120px;">
-                Panelde Reddet/Düzenle
+                E-postadan Reddet
               </a>
             </td>
           </tr>
@@ -94,7 +94,7 @@ export async function sendApprovalEmail(
           </tr>
         </table>
 
-        <p style="font-size: 0.9em; color: #718096; text-align: center;"><em>(E-postadan yapılan onay/reddetme işlemleri sizi yönetici paneline yönlendirecektir. Asıl işlem panel üzerinden tamamlanmalıdır.)</em></p>
+        <p style="font-size: 0.9em; color: #718096; text-align: center;"><em>(E-postadan yapılan onay/reddetme işlemleri sizi ilgili e-posta yanıt sayfasına yönlendirecektir. Nihai işlem oradan tamamlanır.)</em></p>
         <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
         <p style="font-size: 0.8em; color: #a0aec0; text-align: center;">DüşBox Ekibi<br><em>Bu e-posta otomatik olarak gönderilmiştir. Lütfen yanıtlamayınız.</em></p>
       </div>

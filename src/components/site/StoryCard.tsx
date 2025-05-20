@@ -15,13 +15,13 @@ interface StoryCardProps {
 export function StoryCard({ story, priorityImage = false, large = false }: StoryCardProps) {
   const capitalizedGenre = story.genre.charAt(0).toUpperCase() + story.genre.slice(1).toLowerCase();
   return (
-    <Card 
+    <Card
       className={`
-        flex flex-col h-full overflow-hidden 
-        bg-card/70 backdrop-blur-md 
-        border border-primary/20 
-        shadow-lg hover:shadow-2xl 
-        transition-all duration-300 ease-out 
+        flex flex-col h-full overflow-hidden
+        bg-card/70 backdrop-blur-md
+        border border-primary/20
+        shadow-lg hover:shadow-2xl
+        transition-all duration-300 ease-out
         group rounded-xl
         ${large ? 'col-span-1 md:col-span-2' : ''}
       `}
@@ -29,7 +29,7 @@ export function StoryCard({ story, priorityImage = false, large = false }: Story
       <CardHeader className="p-0 relative overflow-hidden">
         <Link href={`/story/${story.id}`} className="block">
           <Image
-            src={story.imageUrl || \`https://placehold.co/\${large ? '800x500' : '600x400'}.png\`}
+            src={story.imageUrl || `https://placehold.co/${large ? '800x500' : '600x400'}.png`}
             alt={`${story.title} için görsel`}
             width={large ? 800 : 600}
             height={large ? 500 : 400}
@@ -43,8 +43,8 @@ export function StoryCard({ story, priorityImage = false, large = false }: Story
         </Link>
       </CardHeader>
       <CardContent className="p-5 md:p-6 flex-grow">
-        <Badge 
-          variant="secondary" 
+        <Badge
+          variant="secondary"
           className="mb-3 bg-accent/80 text-accent-foreground font-semibold px-3 py-1"
         >
           {capitalizedGenre}
@@ -59,11 +59,11 @@ export function StoryCard({ story, priorityImage = false, large = false }: Story
         </p>
       </CardContent>
       <CardFooter className="p-5 md:p-6 pt-0">
-        <Button 
-          asChild 
-          variant="outline" 
+        <Button
+          asChild
+          variant="outline"
           className="
-            text-primary border-primary/40 hover:bg-primary/10 hover:text-accent hover:border-accent 
+            text-primary border-primary/40 hover:bg-primary/10 hover:text-accent hover:border-accent
             transition-all duration-200 group-hover:bg-primary/5
           "
         >

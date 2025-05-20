@@ -2,52 +2,107 @@ import type { SVGProps } from 'react';
 import { APP_NAME } from '@/lib/constants';
 
 export function Logo(props: SVGProps<SVGSVGElement>) {
-  // Adjusted viewBox for a tighter composition and better icon-text integration.
-  // Original: viewBox="0 0 230 52"
-  // New: viewBox="0 0 190 52" (significantly tighter)
-  const defaultHeight = props.height || 40;
-  // Adjusted defaultWidth calculation based on the new viewBox aspect ratio (190/52)
-  const defaultWidth = props.width || (Number(defaultHeight) * (190 / 52));
+  // Yeni viewBox'a göre en-boy oranını (120/130) kullanarak varsayılan genişlik ve yüksekliği ayarla
+  const defaultHeight = props.height || 50; // Logoyu biraz daha belirgin yapmak için varsayılan yüksekliği artırdım
+  const defaultWidth = props.width || (Number(defaultHeight) * (120 / 130));
 
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 190 52" // Tighter viewBox
+      viewBox="0 0 120 130" // Daha dikey bir alana yayılacak şekilde viewBox ayarlandı
       width={defaultWidth}
       height={defaultHeight}
       aria-label={`${APP_NAME} Logosu`}
       {...props}
     >
       <defs>
-        <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+        <linearGradient id="logoTextGradient" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" style={{ stopColor: 'hsl(var(--primary))', stopOpacity: 1 }} />
           <stop offset="100%" style={{ stopColor: 'hsl(var(--accent))', stopOpacity: 1 }} />
         </linearGradient>
+        <radialGradient id="sphereGalaxyGradient" cx="50%" cy="45%" r="55%" fx="50%" fy="40%">
+          <stop offset="0%" style={{ stopColor: 'hsl(var(--accent))', stopOpacity: 0.9 }} />
+          <stop offset="50%" style={{ stopColor: 'hsl(var(--primary))', stopOpacity: 0.8 }} />
+          <stop offset="100%" style={{ stopColor: 'hsl(var(--background))', stopOpacity: 0.7 }} />
+        </radialGradient>
+         <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+          <feMerge>
+            <feMergeNode in="coloredBlur"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
       </defs>
       <style>
         {`
           @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&display=swap');
           .logo-text {
             font-family: 'Cinzel', serif;
-            font-size: 24px; 
-            fill: url(#logoGradient);
+            fill: url(#logoTextGradient);
             letter-spacing: 0.5px;
           }
         `}
       </style>
       
-      {/* Icon: Open Book - Adjusted scale and position for better integration */}
-      {/* Original transform: translate(10, 12.5) scale(1.15) */}
-      {/* New transform moves icon right, slightly down, and makes it a bit smaller */}
-      <g transform="translate(35, 14) scale(0.95)" fill="url(#logoGradient)"> 
-        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
-        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+      <g id="logo-icon-group">
+        {/* Basit bir kutu tabanı */}
+        <rect 
+            x="30" 
+            y="58" 
+            width="60" 
+            height="18" 
+            rx="3" 
+            ry="3" 
+            fill="hsl(var(--card) / 0.8)" 
+            stroke="hsl(var(--border) / 0.5)" 
+            strokeWidth="1"
+        />
+        {/* Ön yüzey efekti için daha parlak bir çizgi */}
+         <path d="M 30 60 L 90 60" stroke="hsl(var(--card-foreground) / 0.2)" strokeWidth="1.5" />
+
+
+        {/* "Galaksi" efektli küre */}
+        <circle 
+            cx="60" 
+            cy="45" 
+            r="30" 
+            fill="url(#sphereGalaxyGradient)" 
+            opacity="0.95"
+            filter="url(#glow)"
+        />
+         {/* Küreye parlaklık katmanı */}
+        <circle 
+            cx="55" 
+            cy="35" 
+            r="8" 
+            fill="white" 
+            opacity="0.3"
+        />
+
+
+        {/* Etrafa yayılan devre/enerji çizgileri (daha soyut) */}
+        <g strokeWidth="1" opacity="0.7" strokeLinecap="round">
+          <line x1="60" y1="45" x2="20" y2="20" stroke="hsl(var(--primary))" />
+          <line x1="60" y1="45" x2="100" y2="20" stroke="hsl(var(--primary))" />
+          <line x1="60" y1="45" x2="60" y2="0" stroke="hsl(var(--primary))" />
+          
+          <line x1="60" y1="45" x2="30" y2="70" stroke="hsl(var(--accent))" />
+          <line x1="60" y1="45" x2="90" y2="70" stroke="hsl(var(--accent))" />
+
+          <circle cx="15" cy="15" r="1.5" fill="hsl(var(--primary))" />
+          <circle cx="105" cy="15" r="1.5" fill="hsl(var(--primary))" />
+          <circle cx="60" cy="-5" r="1.5" fill="hsl(var(--primary))" />
+        </g>
       </g>
       
-      {/* Text: App Name - Adjusted x coordinate for closer placement to the icon */}
-      {/* Original x: 135 */}
-      {/* New x: 122 (center of text shifted left) */}
-      <text x="122" y="36.5" textAnchor="middle" className="logo-text">
+      {/* DüşBox Metni */}
+      <text 
+        x="60" 
+        y="112"  // Metni biraz yukarı aldım
+        textAnchor="middle" 
+        className="logo-text"
+        style={{ fontSize: '26px' }} // Font boyutunu biraz küçülttüm, ikonla daha dengeli olması için
+      >
         {APP_NAME}
       </text>
     </svg>

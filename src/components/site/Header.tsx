@@ -14,7 +14,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from '@/components/ui/sheet';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetClose,
+  SheetTrigger // Added SheetTrigger to the import
+} from '@/components/ui/sheet';
 import { Logo } from '@/components/site/Logo';
 import { cn } from '@/lib/utils';
 import { GENRES, APP_NAME } from '@/lib/constants';

@@ -14,9 +14,7 @@ import type { Story } from '@/lib/types';
 function EmailActionHandler() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const storyId = searchParams.get('storyId');
-  const task = searchParams.get('task');
-
+  
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -24,33 +22,46 @@ function EmailActionHandler() {
 
   useEffect(() => {
     document.title = `E-posta İşlemi | ${APP_NAME} Admin`;
+    const storyIdParam = searchParams.get('storyId');
+    const taskParam = searchParams.get('task');
 
     const processAction = async () => {
-      if (!storyId || !task) {
-        setError('Eksik parametreler. Lütfen e-postadaki bağlantıyı kontrol edin.');
+      if (!storyIdParam && !taskParam) {
+        setError('Eksik parametreler. Lütfen e-postadaki bağlantıyı kontrol edin veya yönetici panelinden devam edin.');
+        setIsLoading(false);
+        return;
+      }
+      if (!storyIdParam) {
+        setError('Hikaye ID parametresi eksik. Lütfen e-postadaki bağlantıyı kontrol edin.');
+        setIsLoading(false);
+        return;
+      }
+      if (!taskParam) {
+        setError('İşlem (task) parametresi eksik. Lütfen e-postadaki bağlantıyı kontrol edin.');
         setIsLoading(false);
         return;
       }
 
+
       try {
-        const storyToUpdate = await dbGetStoryById(storyId);
+        const storyToUpdate = await dbGetStoryById(storyIdParam);
         if (!storyToUpdate) {
-          setError(`Hikaye bulunamadı (ID: ${storyId}). Belki zaten işlenmiş veya silinmiş olabilir.`);
+          setError(`Hikaye bulunamadı (ID: ${storyIdParam}). Belki zaten işlenmiş veya silinmiş olabilir.`);
           setIsLoading(false);
           return;
         }
         setStoryTitle(storyToUpdate.title);
 
-        if (task === 'approve') {
+        if (taskParam === 'approve') {
           if (storyToUpdate.status === 'awaiting_approval') {
-            await dbUpdateStory(storyId, { status: 'pending' });
+            await dbUpdateStory(storyIdParam, { status: 'pending' });
             setMessage(`"${storyToUpdate.title}" başlıklı hikaye başarıyla onaylandı ve yayınlanmak üzere "Bekleyenler" listesine taşındı.`);
           } else {
             setMessage(`"${storyToUpdate.title}" başlıklı hikaye zaten farklı bir durumda (${storyToUpdate.status}). İşlem yapılmadı.`);
           }
-        } else if (task === 'reject') {
+        } else if (taskParam === 'reject') {
            if (storyToUpdate.status === 'awaiting_approval') {
-            await dbDeleteStoryById(storyId);
+            await dbDeleteStoryById(storyIdParam);
             setMessage(`"${storyToUpdate.title}" başlıklı hikaye reddedildi ve onay kuyruğundan kaldırıldı.`);
            } else {
              setMessage(`"${storyToUpdate.title}" başlıklı hikaye zaten farklı bir durumda (${storyToUpdate.status}) veya silinmiş. Reddetme işlemi yapılmadı.`);
@@ -67,7 +78,7 @@ function EmailActionHandler() {
     };
 
     processAction();
-  }, [storyId, task]);
+  }, [searchParams]); // Depend on searchParams directly
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-muted p-4">
@@ -113,7 +124,6 @@ function EmailActionHandler() {
 }
 
 export default function EmailActionPage() {
-  // Suspense is required by Next.js when using useSearchParams in a page component
   return (
     <Suspense fallback={<div className="flex min-h-screen flex-col items-center justify-center bg-muted p-4"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="text-muted-foreground mt-2">Yükleniyor...</p></div>}>
       <EmailActionHandler />

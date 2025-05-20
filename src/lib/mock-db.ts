@@ -2,10 +2,10 @@
 import type { Story, StoryGenre, ScheduledGeneration, ScheduledGenerationStatus, WeeklyScheduleItem, DayOfWeek } from '@/lib/types';
 import { isValid, parseISO, format } from 'date-fns'; // Added format and isValid for direct use here
 
-const STORIES_KEY = 'masalDunyasi_stories';
-const SCHEDULED_GENERATIONS_KEY = 'masalDunyasi_scheduledGenerations';
-const WEEKLY_SCHEDULES_KEY = 'masalDunyasi_weeklySchedules';
-const LAST_WEEKLY_CHECK_KEY = 'masalDunyasi_lastWeeklyCheck';
+const STORIES_KEY = 'dusbox_stories'; // Updated key prefix
+const SCHEDULED_GENERATIONS_KEY = 'dusbox_scheduledGenerations'; // Updated key prefix
+const WEEKLY_SCHEDULES_KEY = 'dusbox_weeklySchedules'; // Updated key prefix
+const LAST_WEEKLY_CHECK_KEY = 'dusbox_lastWeeklyCheck'; // Updated key prefix
 
 // Helper to generate summary
 const generateSummary = (content: string, wordCount: number = 30): string => {
@@ -53,7 +53,7 @@ const initialStoriesData: Story[] = [
     summary: '',
     imageUrl: 'https://placehold.co/600x480.png',
     genre: 'Korku',
-    status: 'awaiting_approval', // Changed to awaiting_approval for testing
+    status: 'awaiting_approval', 
     createdAt: new Date().toISOString(),
   }
 ].map(story => ({ ...story, summary: generateSummary(story.content) }));
@@ -85,31 +85,33 @@ const saveToLocalStorage = <T>(key: string, value: T): void => {
 };
 
 export const getStories = async (): Promise<Story[]> => {
-  const stories = getFromLocalStorage<Story[]>(STORIES_KEY, initialStoriesData);
-  if (stories === initialStoriesData && stories.length > 0 && typeof window !== 'undefined' && !window.localStorage.getItem(STORIES_KEY)) {
-      // Initialize localStorage if it's empty and we have initial data
+  const stories = getFromLocalStorage<Story[]>(STORIES_KEY, []);
+  if (stories.length === 0 && typeof window !== 'undefined' && !window.localStorage.getItem(STORIES_KEY)) {
+      // Initialize localStorage if it's empty and we want to start with initial data
       saveToLocalStorage(STORIES_KEY, initialStoriesData);
+      return JSON.parse(JSON.stringify(initialStoriesData));
   }
   return JSON.parse(JSON.stringify(stories));
 };
 
 export const getStoryById = async (id: string): Promise<Story | undefined> => {
-  const stories = getFromLocalStorage<Story[]>(STORIES_KEY, []);
+  const stories = await getStories(); // Ensure localStorage is initialized if needed
   const story = stories.find(s => s.id === id);
   return story ? JSON.parse(JSON.stringify(story)) : undefined;
 };
 
-export const addStory = async (storyData: Omit<Story, 'id' | 'summary' | 'createdAt' | 'status'> & { status?: Story['status'] }): Promise<Story> => {
-  let stories = getFromLocalStorage<Story[]>(STORIES_KEY, []);
+export const addStory = async (storyData: Omit<Story, 'summary' | 'createdAt'> & { id: string; status?: Story['status'] }): Promise<Story> => {
+  let stories = await getStories(); // Ensure stories are loaded/initialized
   const newStory: Story = {
+    id: storyData.id, // Use the ID from storyData
     title: storyData.title,
     content: storyData.content,
     imageUrl: storyData.imageUrl,
     genre: storyData.genre,
-    id: String(Date.now() + Math.random()),
+    subGenre: storyData.subGenre,
     summary: generateSummary(storyData.content),
     createdAt: new Date().toISOString(),
-    status: storyData.status || 'awaiting_approval', // Default to awaiting_approval
+    status: storyData.status || 'awaiting_approval',
   };
   stories.unshift(newStory);
   saveToLocalStorage(STORIES_KEY, stories);
@@ -118,7 +120,7 @@ export const addStory = async (storyData: Omit<Story, 'id' | 'summary' | 'create
 };
 
 export const updateStory = async (id: string, updates: Partial<Omit<Story, 'id'>>): Promise<Story | undefined> => {
-  let stories = getFromLocalStorage<Story[]>(STORIES_KEY, []);
+  let stories = await getStories();
   const storyIndex = stories.findIndex(s => s.id === id);
   if (storyIndex === -1) {
     console.error('[DB UpdateStory] Story not found:', id);
@@ -135,7 +137,7 @@ export const updateStory = async (id: string, updates: Partial<Omit<Story, 'id'>
 };
 
 export const deleteStoryById = async (id: string): Promise<boolean> => {
-  let stories = getFromLocalStorage<Story[]>(STORIES_KEY, []);
+  let stories = await getStories();
   const initialLength = stories.length;
   stories = stories.filter(s => s.id !== id);
   saveToLocalStorage(STORIES_KEY, stories);
@@ -145,13 +147,12 @@ export const deleteStoryById = async (id: string): Promise<boolean> => {
 // Scheduled Generations
 const sortScheduledGenerations = (items: ScheduledGeneration[]): ScheduledGeneration[] => {
   return [...items].sort((a, b) => {
-    // Handle cases where scheduledDate or scheduledTime might be undefined or invalid
     const aDateValid = a.scheduledDate && a.scheduledTime;
     const bDateValid = b.scheduledDate && b.scheduledTime;
 
     if (!aDateValid && !bDateValid) return 0;
-    if (!aDateValid) return 1; // Sort items without valid dates to the end
-    if (!bDateValid) return -1; // Sort items without valid dates to the end
+    if (!aDateValid) return 1; 
+    if (!bDateValid) return -1;
 
     try {
       const dateA = parseISO(`${a.scheduledDate}T${a.scheduledTime}`);
@@ -170,10 +171,8 @@ const sortScheduledGenerations = (items: ScheduledGeneration[]): ScheduledGenera
 
 export const getScheduledGenerations = async (): Promise<ScheduledGeneration[]> => {
   let items = getFromLocalStorage<ScheduledGeneration[]>(SCHEDULED_GENERATIONS_KEY, []);
-  if (typeof window !== 'undefined' && window.localStorage.getItem(SCHEDULED_GENERATIONS_KEY) === null) {
-    // Ensure localStorage is initialized if it was never set.
+  if (items.length === 0 && typeof window !== 'undefined' && !window.localStorage.getItem(SCHEDULED_GENERATIONS_KEY)) {
     saveToLocalStorage(SCHEDULED_GENERATIONS_KEY, []);
-    items = []; 
   }
   return JSON.parse(JSON.stringify(sortScheduledGenerations(items)));
 };
@@ -181,7 +180,7 @@ export const getScheduledGenerations = async (): Promise<ScheduledGeneration[]> 
 export const addScheduledGeneration = async (
   data: Omit<ScheduledGeneration, 'id' | 'status' | 'createdAt'>
 ): Promise<{ newScheduledGeneration: ScheduledGeneration; allItems: ScheduledGeneration[] }> => {
-  let items = getFromLocalStorage<ScheduledGeneration[]>(SCHEDULED_GENERATIONS_KEY, []);
+  let items = await getScheduledGenerations();
   const newScheduledGeneration: ScheduledGeneration = {
     ...data,
     id: `sg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -189,9 +188,8 @@ export const addScheduledGeneration = async (
     createdAt: new Date().toISOString(),
   };
   items.push(newScheduledGeneration);
-  saveToLocalStorage(SCHEDULED_GENERATIONS_KEY, items); // Save the updated array
+  saveToLocalStorage(SCHEDULED_GENERATIONS_KEY, items); 
   
-  // Fetch all items again from localStorage to ensure sorted and complete list is returned
   const allCurrentItems = getFromLocalStorage<ScheduledGeneration[]>(SCHEDULED_GENERATIONS_KEY, []);
   return { 
     newScheduledGeneration: JSON.parse(JSON.stringify(newScheduledGeneration)), 
@@ -200,7 +198,7 @@ export const addScheduledGeneration = async (
 };
 
 export const updateScheduledGenerationStatus = async (id: string, status: ScheduledGenerationStatus, generatedStoryId?: string, errorMessage?: string): Promise<ScheduledGeneration | undefined> => {
-  let items = getFromLocalStorage<ScheduledGeneration[]>(SCHEDULED_GENERATIONS_KEY, []);
+  let items = await getScheduledGenerations();
   const index = items.findIndex(sg => sg.id === id);
   if (index === -1) return undefined;
   items[index].status = status;
@@ -218,7 +216,7 @@ export const updateScheduledGenerationStatus = async (id: string, status: Schedu
 };
 
 export const deleteScheduledGenerationById = async (id: string): Promise<boolean> => {
-  let items = getFromLocalStorage<ScheduledGeneration[]>(SCHEDULED_GENERATIONS_KEY, []);
+  let items = await getScheduledGenerations();
   const initialLength = items.length;
   items = items.filter(sg => sg.id !== id);
   saveToLocalStorage(SCHEDULED_GENERATIONS_KEY, items);
@@ -226,9 +224,11 @@ export const deleteScheduledGenerationById = async (id: string): Promise<boolean
 };
 
 export const getScheduledGenerationById = async (id: string): Promise<ScheduledGeneration | undefined> => {
-  console.warn("dbGetScheduledGenerationById is likely called from server action, which cannot access localStorage. This will return undefined on server.");
-  if (typeof window === 'undefined') return undefined; // Cannot access localStorage on server
-  const items = getFromLocalStorage<ScheduledGeneration[]>(SCHEDULED_GENERATIONS_KEY, []);
+  if (typeof window === 'undefined') {
+    console.warn("dbGetScheduledGenerationById called on server, cannot access localStorage. Returning undefined.");
+    return undefined; 
+  }
+  const items = await getScheduledGenerations();
   const scheduledItem = items.find(s => s.id === id);
   return scheduledItem ? JSON.parse(JSON.stringify(scheduledItem)) : undefined;
 };
@@ -237,13 +237,13 @@ export const getScheduledGenerationById = async (id: string): Promise<ScheduledG
 export const getWeeklySchedules = async (): Promise<WeeklyScheduleItem[]> => {
   const items = getFromLocalStorage<WeeklyScheduleItem[]>(WEEKLY_SCHEDULES_KEY, []);
    if(items.length === 0 && typeof window !== 'undefined' && !window.localStorage.getItem(WEEKLY_SCHEDULES_KEY)) {
-    saveToLocalStorage(WEEKLY_SCHEDULES_KEY, []); // Initialize if not set
+    saveToLocalStorage(WEEKLY_SCHEDULES_KEY, []); 
   }
   return JSON.parse(JSON.stringify(items));
 };
 
 export const upsertWeeklySchedule = async (itemData: Omit<WeeklyScheduleItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<WeeklyScheduleItem> => {
-  let items = getFromLocalStorage<WeeklyScheduleItem[]>(WEEKLY_SCHEDULES_KEY, []);
+  let items = await getWeeklySchedules();
   const existingItemIndex = items.findIndex(ws => ws.dayOfWeek === itemData.dayOfWeek && ws.time === itemData.time);
   const now = new Date().toISOString();
 
@@ -270,7 +270,7 @@ export const upsertWeeklySchedule = async (itemData: Omit<WeeklyScheduleItem, 'i
 };
 
 export const deleteWeeklyScheduleByDayTime = async (dayOfWeek: DayOfWeek, time: string): Promise<boolean> => {
-  let items = getFromLocalStorage<WeeklyScheduleItem[]>(WEEKLY_SCHEDULES_KEY, []);
+  let items = await getWeeklySchedules();
   const initialLength = items.length;
   items = items.filter(ws => !(ws.dayOfWeek === dayOfWeek && ws.time === time));
   saveToLocalStorage(WEEKLY_SCHEDULES_KEY, items);
@@ -284,4 +284,31 @@ export const getLastWeeklyCheckTime = async (): Promise<string | null> => {
 
 export const setLastWeeklyCheckTime = async (time: string): Promise<void> => {
     saveToLocalStorage(LAST_WEEKLY_CHECK_KEY, time);
+}
+
+// Function to ensure initial data is in localStorage
+export const initializeDb = async () => {
+  if (typeof window !== 'undefined') {
+    if (!window.localStorage.getItem(STORIES_KEY)) {
+      console.log('Initializing stories in localStorage with initial data.');
+      saveToLocalStorage(STORIES_KEY, initialStoriesData);
+    }
+    if (!window.localStorage.getItem(SCHEDULED_GENERATIONS_KEY)) {
+      console.log('Initializing scheduled generations in localStorage.');
+      saveToLocalStorage(SCHEDULED_GENERATIONS_KEY, []);
+    }
+    if (!window.localStorage.getItem(WEEKLY_SCHEDULES_KEY)) {
+      console.log('Initializing weekly schedules in localStorage.');
+      saveToLocalStorage(WEEKLY_SCHEDULES_KEY, []);
+    }
+     if (!window.localStorage.getItem(LAST_WEEKLY_CHECK_KEY)) {
+      console.log('Initializing last weekly check time in localStorage.');
+      saveToLocalStorage(LAST_WEEKLY_CHECK_KEY, null);
+    }
+  }
+};
+
+// Call initializeDb when mock-db is loaded on the client-side
+if (typeof window !== 'undefined') {
+  initializeDb();
 }

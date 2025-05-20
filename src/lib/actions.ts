@@ -4,10 +4,9 @@
 import type { Story, StoryGenre, ScheduledGeneration, WeeklyScheduleItem, DayOfWeek, StorySubGenre } from '@/lib/types';
 import type { StoryLength, StoryComplexity } from '@/lib/constants';
 import { sendApprovalEmail } from '@/lib/email-service';
-
-
 import { generateStory as aiGenerateStory } from '@/ai/flows/generate-story';
 import { regenerateAIImage as aiRegenerateAIImage } from '@/ai/flows/generate-image';
+import { randomUUID } from 'crypto'; // For generating unique IDs
 
 // Client components will call mock-db functions directly for localStorage modifications.
 // Server actions are now primarily for:
@@ -56,11 +55,10 @@ export async function generateNewStoryAction(
   genre: StoryGenre, 
   length?: StoryLength, 
   complexity?: StoryComplexity,
-  subGenre?: StorySubGenre // Yeni parametre: Alt Kategori
-): Promise<{ success: boolean; storyData?: Omit<Story, 'summary' | 'createdAt'> & {id?: string} ; error?: string }> {
+  subGenre?: StorySubGenre
+): Promise<{ success: boolean; storyData?: Omit<Story, 'summary' | 'createdAt'> & {id: string} ; error?: string }> {
   try {
     console.log(`[Action] generateNewStoryAction: Generating story for genre: ${genre}, subGenre: ${subGenre}, length: ${length}, complexity: ${complexity}`);
-    // AI akışına subGenre'yi de gönder
     const aiResult = await aiGenerateStory({ genre, length, complexity, subGenre }); 
     console.log(`[Action] generateNewStoryAction: AI result received: Title: ${aiResult?.title ? 'Yes' : 'No'}, Content: ${aiResult?.content ? 'Yes' : 'No'}, ImageUrl: ${aiResult?.imageUrl ? 'Yes' : 'No'}`);
 
@@ -73,26 +71,25 @@ export async function generateNewStoryAction(
       throw new Error(specificError);
     }
     
-    const tempStoryId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const storyId = randomUUID(); // Generate a unique ID on the server
 
     const newStoryData: Omit<Story, 'summary' | 'createdAt'> & { id: string } = {
-      id: tempStoryId, 
+      id: storyId, 
       title: aiResult.title,
       content: aiResult.content,
       imageUrl: aiResult.imageUrl, 
       genre: genre,
-      subGenre: subGenre, // Alt kategoriyi kaydet
+      subGenre: subGenre,
       status: 'awaiting_approval', 
     };
-    console.log(`[Action] generateNewStoryAction: Story data prepared successfully for genre: ${genre}, subGenre: ${subGenre}, status: 'awaiting_approval', tempId: ${tempStoryId}`);
+    console.log(`[Action] generateNewStoryAction: Story data prepared successfully. ID: ${storyId}, Genre: ${genre}, SubGenre: ${subGenre}, Status: 'awaiting_approval'`);
     
-    if (newStoryData.status === 'awaiting_approval') {
-      const emailSent = await sendApprovalEmail(newStoryData.id, newStoryData.title, newStoryData.content);
-      if (emailSent) {
-        console.log(`[Action] generateNewStoryAction: Approval email successfully queued for "${newStoryData.title}" (ID: ${newStoryData.id}).`);
-      } else {
-        console.warn(`[Action] generateNewStoryAction: Failed to send approval email for "${newStoryData.title}". Proceeding without email.`);
-      }
+    // Send approval email
+    const emailSent = await sendApprovalEmail(newStoryData.id, newStoryData.title, newStoryData.content);
+    if (emailSent) {
+      console.log(`[Action] generateNewStoryAction: Approval email successfully queued for "${newStoryData.title}" (ID: ${newStoryData.id}).`);
+    } else {
+      console.warn(`[Action] generateNewStoryAction: Failed to send approval email for "${newStoryData.title}". Proceeding without email, but story is ready for localStorage.`);
     }
 
     return { success: true, storyData: newStoryData };
@@ -184,13 +181,10 @@ export async function processScheduledGenerationAction(id: string, genre: StoryG
   console.log(`[Action] processScheduledGenerationAction: Processing scheduled generation ID: ${id} for Genre: ${genre}`);
   
   try {
-    // Burada subGenre, length, complexity gibi değerler için varsayılanlar kullanılabilir veya
-    // ScheduledGeneration türüne bu alanlar eklenerek daha sonra planlama sayfasından ayarlanabilir.
-    // Şimdilik varsayılan (undefined) olarak bırakıyorum.
     const generationResult = await generateNewStoryAction(genre, undefined, undefined, undefined); 
 
     if (generationResult.success && generationResult.storyData) {
-      console.log(`[Action] processScheduledGenerationAction: Story generated successfully by AI for scheduled ID: ${id}, Genre: ${genre}. Story title: "${generationResult.storyData.title}", Temp Story ID for email: ${generationResult.storyData.id}`);
+      console.log(`[Action] processScheduledGenerationAction: Story generated successfully by AI for scheduled ID: ${id}, Genre: ${genre}. Story title: "${generationResult.storyData.title}", Story ID: ${generationResult.storyData.id}`);
       return { 
         success: true, 
         storyData: generationResult.storyData, 

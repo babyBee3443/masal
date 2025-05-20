@@ -2,10 +2,10 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image'; // Added for placeholder image
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { Menu, X, BookOpen, Home, LayoutGrid, Sparkles, TrendingUp, FileText, HelpCircle, Telescope, Heart, Brain, Ghost } from 'lucide-react'; // Added icons
-import { useState, useEffect } from 'react';
+import { Menu, X, BookOpen, Home, LayoutGrid, Sparkles, TrendingUp, FileText, HelpCircle, Telescope, Heart, Brain, Ghost } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react'; // Added useRef
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -14,7 +14,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuGroup, // Added for better structure
+  DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
 import {
   Sheet,
@@ -41,9 +41,9 @@ const GenreIcon = ({ genre, className }: { genre: StoryGenre; className?: string
     case 'Korku': return <Ghost className={iconClassName} />;
     case 'Macera': return <Telescope className={iconClassName} />;
     case 'Romantik': return <Heart className={iconClassName} />;
-    case 'Bilim Kurgu': return <Sparkles className={iconClassName} />; // Changed from Satellite to Sparkles
-    case 'Fabl': return <FileText className={iconClassName} />; // Changed from Footprints to FileText
-    case 'Felsefi': return <Brain className={iconClassName} />; // Changed from Scale to Brain
+    case 'Bilim Kurgu': return <Sparkles className={iconClassName} />;
+    case 'Fabl': return <FileText className={iconClassName} />;
+    case 'Felsefi': return <Brain className={iconClassName} />;
     default: return <HelpCircle className={iconClassName} />;
   }
 };
@@ -53,6 +53,8 @@ export function Header() {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isCategoriesMenuOpen, setIsCategoriesMenuOpen] = useState(false);
+  const categoriesMenuTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -61,6 +63,20 @@ export function Header() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  const openCategoriesMenu = () => {
+    if (categoriesMenuTimeoutRef.current) {
+      clearTimeout(categoriesMenuTimeoutRef.current);
+      categoriesMenuTimeoutRef.current = null;
+    }
+    setIsCategoriesMenuOpen(true);
+  };
+
+  const closeCategoriesMenuWithDelay = () => {
+    categoriesMenuTimeoutRef.current = setTimeout(() => {
+      setIsCategoriesMenuOpen(false);
+    }, 300); // 300ms delay
+  };
 
   const NavLinkItem = ({ href, label, icon: Icon, exact = false }: { href: string; label: string; icon: React.ElementType; exact?: boolean}) => {
     const isActive = exact ? pathname === href : pathname.startsWith(href);
@@ -82,7 +98,7 @@ export function Header() {
     const isActive = pathname === href;
     return (
        <Button variant="ghost" asChild className={cn(
-        "justify-start text-sm font-medium transition-colors hover:text-primary pl-10", // Kept pl-10 for mobile indentation
+        "justify-start text-sm font-medium transition-colors hover:text-primary pl-10",
         isActive ? "text-primary font-semibold" : "text-foreground/60"
       )}>
         <Link href={href} onClick={() => setIsMobileMenuOpen(false)}>
@@ -114,17 +130,28 @@ export function Header() {
             </Link>
           </Button>
 
-          <DropdownMenu>
+          <DropdownMenu open={isCategoriesMenuOpen} onOpenChange={setIsCategoriesMenuOpen}>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className={cn(
-                "text-sm font-medium transition-colors hover:text-primary px-3 py-2",
-                pathname.startsWith('/categories') ? "text-primary" : "text-foreground/70"
-              )}>
+              <Button 
+                variant="ghost" 
+                className={cn(
+                  "text-sm font-medium transition-colors hover:text-primary px-3 py-2",
+                  pathname.startsWith('/categories') || isCategoriesMenuOpen ? "text-primary" : "text-foreground/70"
+                )}
+                onMouseEnter={openCategoriesMenu}
+                onMouseLeave={closeCategoriesMenuWithDelay}
+                // onClick={() => setIsCategoriesMenuOpen(prev => !prev)} // Keep click for touch devices
+              >
                 <LayoutGrid className="mr-2 h-4 w-4" />
                 Kategoriler
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-[680px] p-4 bg-card shadow-xl rounded-lg border" sideOffset={10}>
+            <DropdownMenuContent 
+              className="w-[680px] p-4 bg-card shadow-xl rounded-lg border" 
+              sideOffset={10}
+              onMouseEnter={openCategoriesMenu} // Keep menu open when mouse is over content
+              onMouseLeave={closeCategoriesMenuWithDelay} // Close menu when mouse leaves content
+            >
               <div className="grid grid-cols-3 gap-x-6">
                 {/* Column 1: DüşBox Kategorileri */}
                 <div className="space-y-2">

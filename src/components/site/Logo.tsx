@@ -2,14 +2,14 @@ import type { SVGProps } from 'react';
 import { APP_NAME } from '@/lib/constants';
 
 export function Logo(props: SVGProps<SVGSVGElement>) {
-  // Yeni viewBox'a göre en-boy oranını (120/130) kullanarak varsayılan genişlik ve yüksekliği ayarla
-  const defaultHeight = props.height || 50; // Logoyu biraz daha belirgin yapmak için varsayılan yüksekliği artırdım
+  // viewBox'a göre en-boy oranını (120/130) kullanarak varsayılan genişlik ve yüksekliği ayarla
+  const defaultHeight = props.height || 50; 
   const defaultWidth = props.width || (Number(defaultHeight) * (120 / 130));
 
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 120 130" // Daha dikey bir alana yayılacak şekilde viewBox ayarlandı
+      viewBox="0 0 120 130" // viewBox sabit kalıyor
       width={defaultWidth}
       height={defaultHeight}
       aria-label={`${APP_NAME} Logosu`}
@@ -26,7 +26,7 @@ export function Logo(props: SVGProps<SVGSVGElement>) {
           <stop offset="100%" style={{ stopColor: 'hsl(var(--background))', stopOpacity: 0.7 }} />
         </radialGradient>
          <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+          <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/> {/* Hafifçe artırılmış bulanıklık */}
           <feMerge>
             <feMergeNode in="coloredBlur"/>
             <feMergeNode in="SourceGraphic"/>
@@ -45,63 +45,62 @@ export function Logo(props: SVGProps<SVGSVGElement>) {
       </style>
       
       <g id="logo-icon-group">
-        {/* Basit bir kutu tabanı */}
+        {/* Kutu tabanı - Biraz daha büyük */}
         <rect 
-            x="30" 
-            y="58" 
-            width="60" 
-            height="18" 
-            rx="3" 
-            ry="3" 
+            x="25"  // (120-70)/2
+            y="70"  // Kürenin altına gelecek şekilde ayarlandı
+            width="70" 
+            height="20" 
+            rx="4" 
+            ry="4" 
             fill="hsl(var(--card) / 0.8)" 
             stroke="hsl(var(--border) / 0.5)" 
-            strokeWidth="1"
+            strokeWidth="1.5" // Kenarlık biraz daha belirgin
         />
-        {/* Ön yüzey efekti için daha parlak bir çizgi */}
-         <path d="M 30 60 L 90 60" stroke="hsl(var(--card-foreground) / 0.2)" strokeWidth="1.5" />
+        {/* Ön yüzey efekti */}
+         <path d="M 25 72 L 95 72" stroke="hsl(var(--card-foreground) / 0.2)" strokeWidth="2" />
 
-
-        {/* "Galaksi" efektli küre */}
+        {/* "Galaksi" efektli küre - Daha büyük */}
         <circle 
             cx="60" 
-            cy="45" 
-            r="30" 
+            cy="40"  // Biraz yukarı çekildi
+            r="35"    // Yarıçap artırıldı
             fill="url(#sphereGalaxyGradient)" 
             opacity="0.95"
             filter="url(#glow)"
         />
-         {/* Küreye parlaklık katmanı */}
+         {/* Küreye parlaklık katmanı - Biraz daha büyük ve farklı konumda */}
         <circle 
-            cx="55" 
-            cy="35" 
-            r="8" 
+            cx="53"  // Konum ayarlandı
+            cy="30"  // Konum ayarlandı
+            r="10"   // Boyut artırıldı
             fill="white" 
-            opacity="0.3"
+            opacity="0.25" // Opaklık biraz düşürüldü
         />
 
-
-        {/* Etrafa yayılan devre/enerji çizgileri (daha soyut) */}
-        <g strokeWidth="1" opacity="0.7" strokeLinecap="round">
-          <line x1="60" y1="45" x2="20" y2="20" stroke="hsl(var(--primary))" />
-          <line x1="60" y1="45" x2="100" y2="20" stroke="hsl(var(--primary))" />
-          <line x1="60" y1="45" x2="60" y2="0" stroke="hsl(var(--primary))" />
+        {/* Etrafa yayılan devre/enerji çizgileri (yeni küre konumuna göre ayarlandı) */}
+        <g strokeWidth="1.5" opacity="0.75" strokeLinecap="round"> {/* Çizgi kalınlığı ve opaklık artırıldı */}
+          <line x1="60" y1="40" x2="15" y2="10" stroke="hsl(var(--primary))" />
+          <line x1="60" y1="40" x2="105" y2="10" stroke="hsl(var(--primary))" />
+          <line x1="60" y1="40" x2="60" y2="-5" stroke="hsl(var(--primary))" /> {/* Biraz daha yukarı uzasın */}
           
-          <line x1="60" y1="45" x2="30" y2="70" stroke="hsl(var(--accent))" />
-          <line x1="60" y1="45" x2="90" y2="70" stroke="hsl(var(--accent))" />
+          <line x1="60" y1="40" x2="25" y2="70" stroke="hsl(var(--accent))" />
+          <line x1="60" y1="40" x2="95" y2="70" stroke="hsl(var(--accent))" />
 
-          <circle cx="15" cy="15" r="1.5" fill="hsl(var(--primary))" />
-          <circle cx="105" cy="15" r="1.5" fill="hsl(var(--primary))" />
-          <circle cx="60" cy="-5" r="1.5" fill="hsl(var(--primary))" />
+          {/* Noktalar biraz daha büyük */}
+          <circle cx="10" cy="5" r="2" fill="hsl(var(--primary))" />
+          <circle cx="110" cy="5" r="2" fill="hsl(var(--primary))" />
+          <circle cx="60" cy="-10" r="2" fill="hsl(var(--primary))" />
         </g>
       </g>
       
-      {/* DüşBox Metni */}
+      {/* DüşBox Metni - Daha büyük ve kutuya göre ayarlanmış */}
       <text 
         x="60" 
-        y="112"  // Metni biraz yukarı aldım
+        y="122"  // Yeni kutu konumuna göre ayarlandı
         textAnchor="middle" 
         className="logo-text"
-        style={{ fontSize: '26px' }} // Font boyutunu biraz küçülttüm, ikonla daha dengeli olması için
+        style={{ fontSize: '30px' }} // Font boyutu artırıldı
       >
         {APP_NAME}
       </text>

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { Menu, X, BookOpen, Home, LayoutGrid, Sparkles, TrendingUp, FileText, HelpCircle, Telescope, Heart, Brain, Ghost } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react'; // Added useRef
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -14,7 +14,6 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
 import {
   Sheet,
@@ -33,7 +32,6 @@ import type { StoryGenre } from '@/lib/types';
 const mainNavLink = { href: '/', label: 'Anasayfa', icon: Home };
 const adminPanelLink = { href: '/admin', label: 'Admin Paneli', icon: BookOpen };
 
-// Helper to map genre to icon
 const GenreIcon = ({ genre, className }: { genre: StoryGenre; className?: string }) => {
   const defaultClassName = "mr-2 h-5 w-5 text-primary";
   const iconClassName = cn(defaultClassName, className);
@@ -73,6 +71,9 @@ export function Header() {
   };
 
   const closeCategoriesMenuWithDelay = () => {
+    if (categoriesMenuTimeoutRef.current) {
+      clearTimeout(categoriesMenuTimeoutRef.current);
+    }
     categoriesMenuTimeoutRef.current = setTimeout(() => {
       setIsCategoriesMenuOpen(false);
     }, 300); // 300ms delay
@@ -92,7 +93,7 @@ export function Header() {
       </Button>
     );
   };
-  
+
   const CategoryLinkItem = ({ genre }: { genre: StoryGenre }) => {
     const href = `/categories/${genre}`;
     const isActive = pathname === href;
@@ -107,7 +108,6 @@ export function Header() {
       </Button>
     )
   }
-
 
   return (
     <header className={cn(
@@ -132,25 +132,25 @@ export function Header() {
 
           <DropdownMenu open={isCategoriesMenuOpen} onOpenChange={setIsCategoriesMenuOpen}>
             <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 className={cn(
                   "text-sm font-medium transition-colors hover:text-primary px-3 py-2",
-                  pathname.startsWith('/categories') || isCategoriesMenuOpen ? "text-primary" : "text-foreground/70"
+                  (pathname.startsWith('/categories') || isCategoriesMenuOpen) ? "text-primary" : "text-foreground/70"
                 )}
                 onMouseEnter={openCategoriesMenu}
                 onMouseLeave={closeCategoriesMenuWithDelay}
-                // onClick={() => setIsCategoriesMenuOpen(prev => !prev)} // Keep click for touch devices
+                // onClick={() => setIsCategoriesMenuOpen(prev => !prev)} // Removed this direct onClick
               >
                 <LayoutGrid className="mr-2 h-4 w-4" />
                 Kategoriler
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent 
-              className="w-[680px] p-4 bg-card shadow-xl rounded-lg border" 
+            <DropdownMenuContent
+              className="w-[680px] p-4 bg-card shadow-xl rounded-lg border"
               sideOffset={10}
-              onMouseEnter={openCategoriesMenu} // Keep menu open when mouse is over content
-              onMouseLeave={closeCategoriesMenuWithDelay} // Close menu when mouse leaves content
+              onMouseEnter={openCategoriesMenu}
+              onMouseLeave={closeCategoriesMenuWithDelay}
             >
               <div className="grid grid-cols-3 gap-x-6">
                 {/* Column 1: DüşBox Kategorileri */}
@@ -158,7 +158,7 @@ export function Header() {
                   <DropdownMenuLabel className="text-base font-semibold text-foreground px-2">DüşBox Kategorileri</DropdownMenuLabel>
                   <DropdownMenuSeparator className="my-1" />
                   {GENRES.map((genre) => (
-                    <DropdownMenuItem key={genre} asChild className="p-0">
+                    <DropdownMenuItem key={genre} asChild className="p-0 group">
                       <Link href={`/categories/${genre}`} className="flex items-center w-full px-2 py-2 text-sm rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
                         <GenreIcon genre={genre} className="h-5 w-5 mr-3 text-muted-foreground group-hover:text-accent-foreground" />
                         <span>{genre}</span>
@@ -191,19 +191,19 @@ export function Header() {
                 <div className="space-y-2">
                   <DropdownMenuLabel className="text-base font-semibold text-foreground px-2">Popüler Masallar</DropdownMenuLabel>
                   <DropdownMenuSeparator className="my-1" />
-                  <DropdownMenuItem asChild className="p-0">
+                  <DropdownMenuItem asChild className="p-0 group">
                     <Link href="/story/placeholder-popular-1" className="flex items-center w-full px-2 py-2 text-sm rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
                       <TrendingUp className="h-5 w-5 mr-3 text-muted-foreground group-hover:text-accent-foreground"/>
                       <span>Yıldız Tozu ve Hayaller</span>
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem asChild className="p-0">
+                  <DropdownMenuItem asChild className="p-0 group">
                      <Link href="/story/placeholder-popular-2" className="flex items-center w-full px-2 py-2 text-sm rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
                       <TrendingUp className="h-5 w-5 mr-3 text-muted-foreground group-hover:text-accent-foreground"/>
                       <span>Unutulmuş Krallık</span>
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem asChild className="p-0">
+                  <DropdownMenuItem asChild className="p-0 group">
                      <Link href="/story/placeholder-popular-3" className="flex items-center w-full px-2 py-2 text-sm rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
                       <TrendingUp className="h-5 w-5 mr-3 text-muted-foreground group-hover:text-accent-foreground"/>
                       <span>Denizin Altındaki Melodi</span>
@@ -222,7 +222,7 @@ export function Header() {
               </div>
             </DropdownMenuContent>
           </DropdownMenu>
-          
+
            <Button variant="ghost" asChild className={cn(
               "text-sm font-medium transition-colors hover:text-primary px-3 py-2",
                pathname.startsWith(adminPanelLink.href) ? "text-primary" : "text-foreground/70"
@@ -247,7 +247,7 @@ export function Header() {
                 <Link href="/" onClick={() => setIsMobileMenuOpen(false)}>
                   <Logo className="h-8 w-auto" />
                 </Link>
-                <SheetTitle className="sr-only">Ana Menü</SheetTitle> 
+                <SheetTitle className="sr-only">Ana Menü</SheetTitle>
                 <SheetClose asChild>
                   <Button variant="ghost" size="icon">
                     <X className="h-6 w-6" />
@@ -257,14 +257,14 @@ export function Header() {
               </SheetHeader>
               <nav className="flex flex-col space-y-1 p-4 flex-grow overflow-y-auto">
                 <NavLinkItem href={mainNavLink.href} label={mainNavLink.label} icon={mainNavLink.icon} exact={true} />
-                
+
                 <div> {/* Wrapper for Kategoriler and its sub-items */}
                   <NavLinkItem href={`/categories/${GENRES[0]}`} label="Kategoriler" icon={LayoutGrid} />
                   <div className="flex flex-col mt-1 space-y-0.5">
                     {GENRES.map(genre => <CategoryLinkItem key={genre} genre={genre} />)}
                   </div>
                 </div>
-                
+
                  <NavLinkItem href={adminPanelLink.href} label={adminPanelLink.label} icon={adminPanelLink.icon} />
               </nav>
             </SheetContent>

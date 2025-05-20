@@ -2,14 +2,14 @@
 'use client';
 
 import { useEffect, useState, Suspense } from 'react';
-import { useSearchParams, useRouter }_from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { updateStory as dbUpdateStory, deleteStoryById as dbDeleteStoryById, getStoryById as dbGetStoryById }_from '@/lib/mock-db';
-import { Button }_from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle }_from '@/components/ui/card';
-import { Loader2, CheckCircle, XCircle, AlertTriangle, Home }_from 'lucide-react';
-import { APP_NAME }_from '@/lib/constants';
-import type { Story }_from '@/lib/types';
+import { updateStory as dbUpdateStory, deleteStoryById as dbDeleteStoryById, getStoryById as dbGetStoryById } from '@/lib/mock-db';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Loader2, CheckCircle, XCircle, AlertTriangle, Home } from 'lucide-react';
+import { APP_NAME } from '@/lib/constants';
+import type { Story } from '@/lib/types';
 
 function EmailActionHandler() {
   const searchParams = useSearchParams();

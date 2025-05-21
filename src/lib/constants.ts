@@ -1,6 +1,7 @@
 
 import type { StoryGenre, StorySubGenre } from './types';
-import { Baby, School, GraduationCap, Users2, Home, Sparkles, Ghost, Telescope, Heart, Brain, FileText, BookOpen, Comedy, Drama, Search, Zap, CalendarDays, Palette, UserCircle, ShieldQuestion, History, PawPrint } from 'lucide-react'; // Comedy, Drama, Search, Zap, CalendarDays, Palette, UserCircle, ShieldQuestion, History, PawPrint ikonları eklendi.
+// Updated import: Comedy -> Smile, Drama -> Theater
+import { Baby, School, GraduationCap, Users2, Home, Sparkles, Ghost, Telescope, Heart, Brain, FileText, BookOpen, Smile, Theater, Search, Zap, CalendarDays, Palette, UserCircle, ShieldQuestion, History, PawPrint } from 'lucide-react';
 
 export const GENRES: StoryGenre[] = ["Korku", "Macera", "Romantik", "Bilim Kurgu", "Fabl", "Felsefi"];
 
@@ -74,24 +75,24 @@ export const HIERARCHICAL_CATEGORIES_FOR_HEADER = [
     audience: TARGET_AUDIENCES.find(ta => ta.value === "cocuk-3-6")!,
     themes: [
       { value: "Macera", label: "Macera", icon: Telescope },
-      { value: "Fabl", label: "Hayvan Masalları", icon: PawPrint }, // Fabl'ı Hayvan Masalları olarak yeniden adlandırdık ve ikonu değiştirdik.
-      { value: "Egitici", label: "Eğitici", icon: Brain }, // Yeni tema, GENRES içinde olmayabilir, link /categories/Egitici şeklinde olur.
-      { value: "Komedi", label: "Komik", icon: Comedy }, // Yeni tema
+      { value: "Fabl", label: "Hayvan Masalları", icon: PawPrint },
+      { value: "Egitici", label: "Eğitici", icon: Brain },
+      { value: "Komedi", label: "Komik", icon: Smile }, // Comedy -> Smile
     ]
   },
   {
     audience: TARGET_AUDIENCES.find(ta => ta.value === "cocuk-7-10")!,
     themes: [
       { value: "Macera", label: "Macera", icon: Telescope },
-      { value: "Fantastik", label: "Fantastik", icon: Sparkles }, // Yeni tema (Bilim Kurgu'dan ayrılabilir veya Macera'nın bir alt türü olabilir)
-      { value: "Gizem", label: "Gizem / Dedektiflik", icon: Search }, // Yeni tema
-      { value: "Korku", label: "Gerilim / Heyecan", icon: Ghost }, // Korku'yu Gerilim/Heyecan olarak yeniden adlandırdık
+      { value: "Fantastik", label: "Fantastik", icon: Sparkles },
+      { value: "Gizem", label: "Gizem / Dedektiflik", icon: Search },
+      { value: "Korku", label: "Gerilim / Heyecan", icon: Ghost },
     ]
   },
   {
     audience: TARGET_AUDIENCES.find(ta => ta.value === "genc-11-18")!,
     themes: [
-      { value: "Bilim Kurgu", label: "Bilim Kurgu", icon: Zap }, // İkon değiştirildi.
+      { value: "Bilim Kurgu", label: "Bilim Kurgu", icon: Zap },
       { value: "Fantastik", label: "Fantastik", icon: Sparkles },
       { value: "Romantik", label: "Romantik", icon: Heart },
       { value: "Korku", label: "Gerilim / Korku", icon: Ghost },
@@ -101,7 +102,7 @@ export const HIERARCHICAL_CATEGORIES_FOR_HEADER = [
   {
     audience: TARGET_AUDIENCES.find(ta => ta.value === "yetiskin")!,
     themes: [
-      { value: "Dram", label: "Dram", icon: Drama }, // Yeni tema
+      { value: "Dram", label: "Dram", icon: Theater }, // Drama -> Theater
       { value: "Korku", label: "Gerilim / Korku", icon: Ghost },
       { value: "Felsefi", label: "Düşündüren / Felsefi", icon: Brain },
       { value: "Romantik", label: "Romantik", icon: Heart },
@@ -113,7 +114,7 @@ export const HIERARCHICAL_CATEGORIES_FOR_HEADER = [
     themes: [
       { value: "Macera", label: "Ailece Macera", icon: Telescope },
       { value: "Fabl", label: "Ailece Fabl", icon: PawPrint },
-      { value: "Komedi", label: "Ailece Komedi", icon: Comedy },
+      { value: "Komedi", label: "Ailece Komedi", icon: Smile }, // Comedy -> Smile
       { value: "Egitici", label: "Ailece Eğitici", icon: Brain },
     ]
   }
@@ -127,19 +128,19 @@ export const STORY_THEMES_EXTENDED = [
 ];
 
 export const STORY_MOODS = [
-  { value: "gulduren", label: "Güldüren", icon: Comedy },
-  { value: "aglatan", label: "Ağlatan", icon: Drama }, // İkon Drama ile değiştirildi
+  { value: "gulduren", label: "Güldüren", icon: Smile }, // Comedy -> Smile
+  { value: "aglatan", label: "Ağlatan", icon: Theater }, // Drama -> Theater
   { value: "dusunduren", label: "Düşündüren", icon: Brain },
-  { value: "motive-eden", label: "Motive Eden", icon: Zap }, // İkon Zap ile değiştirildi
+  { value: "motive-eden", label: "Motive Eden", icon: Zap },
   { value: "korkutan", label: "Korkutan", icon: Ghost },
   { value: "sasirtan", label: "Şaşırtan", icon: Sparkles },
 ];
 
 export const STORY_SETTINGS = [
   { value: "okulda", label: "Okulda Geçen", icon: School },
-  { value: "dogada", label: "Doğada Geçen", icon: PawPrint }, // İkon değiştirildi
+  { value: "dogada", label: "Doğada Geçen", icon: PawPrint },
   { value: "uzayda", label: "Uzayda Geçen", icon: Zap },
-  { value: "sehirde", label: "Şehirde Geçen", icon: Home }, // İkon değiştirildi
+  { value: "sehirde", label: "Şehirde Geçen", icon: Home },
   { value: "tarihte", label: "Tarihte Geçen", icon: History },
   { value: "masal-diyari", label: "Masal Diyarlarında Geçen", icon: Sparkles },
 ];
@@ -164,15 +165,17 @@ export const getGenreIcon = (genre: StoryGenre | string) => {
     case 'Korku': return Ghost;
     case 'Macera': return Telescope;
     case 'Romantik': return Heart;
-    case 'Bilim Kurgu': return Zap; // İkon Zap olarak güncellendi
-    case 'Fabl': return PawPrint; // İkon PawPrint olarak güncellendi
+    case 'Bilim Kurgu': return Zap;
+    case 'Fabl': return PawPrint;
     case 'Felsefi': return Brain;
     // HIERARCHICAL_CATEGORIES_FOR_HEADER'da tanımlanmış diğer tema value'ları için de case'ler eklenebilir
     case 'Egitici': return Brain;
-    case 'Komedi': return Comedy;
+    case 'Komedi': return Smile; // Comedy -> Smile
     case 'Fantastik': return Sparkles;
     case 'Gizem': return Search;
-    case 'Dram': return Drama;
+    case 'Dram': return Theater; // Drama -> Theater
     default: return BookOpen;
   }
 };
+
+    

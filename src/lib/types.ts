@@ -1,7 +1,8 @@
 
+import type { StoryLength, TargetAudience } from './constants'; // TargetAudience import edildi
+
 export type StoryGenre = "Korku" | "Macera" | "Romantik" | "Bilim Kurgu" | "Fabl" | "Felsefi";
-export type StorySubGenre = string; // Alt kategoriler dinamik olabileceği için string olarak bırakıldı.
-                                 // Daha katı bir yapı istenirse, her ana kategori için ayrı alt kategori türleri tanımlanabilir.
+export type StorySubGenre = string; 
 
 export interface Story {
   id: string;
@@ -10,12 +11,14 @@ export interface Story {
   summary: string;
   imageUrl: string;
   genre: StoryGenre;
-  subGenre?: StorySubGenre; // Yeni alan: Alt Kategori
+  subGenre?: StorySubGenre;
   status: 'awaiting_approval' | 'pending' | 'published';
   createdAt: string; // ISO date string
   publishedAt?: string; // ISO date string
   scheduledAtDate?: string; // YYYY-MM-DD for publication scheduling
   scheduledAtTime?: string; // HH:MM for publication scheduling
+  length?: StoryLength; // Uzunluk eklendi
+  targetAudience?: TargetAudience; // Hedef Kitle eklendi
 }
 
 export type ScheduledGenerationStatus = 'pending' | 'generated' | 'failed';
@@ -31,14 +34,13 @@ export interface ScheduledGeneration {
   errorMessage?: string; // If status is 'failed'
 }
 
-// Represents days of the week, 0 for Monday, 6 for Sunday for UI consistency
 export type DayOfWeek = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 export interface WeeklyScheduleItem {
   id: string;
-  dayOfWeek: DayOfWeek; // 0 (Pazartesi) to 6 (Pazar)
-  time: string; // HH:MM format, e.g., "09:00", "14:30"
+  dayOfWeek: DayOfWeek; 
+  time: string; 
   genre: StoryGenre;
-  createdAt: string; // ISO date string
-  updatedAt: string; // ISO date string
+  createdAt: string; 
+  updatedAt: string; 
 }

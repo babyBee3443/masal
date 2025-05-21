@@ -5,8 +5,8 @@ import type { Story } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowRight, Sparkles, BookText } from 'lucide-react'; 
-import { SUBGENRES_MAP } from '@/lib/constants';
+import { ArrowRight, Sparkles, BookText, Users, Clock } from 'lucide-react'; 
+import { SUBGENRES_MAP, TARGET_AUDIENCES, STORY_LENGTHS } from '@/lib/constants';
 
 
 interface StoryCardProps {
@@ -18,6 +18,8 @@ interface StoryCardProps {
 export function StoryCard({ story, priorityImage = false, large = false }: StoryCardProps) {
   const capitalizedGenre = story.genre.charAt(0).toUpperCase() + story.genre.slice(1).toLowerCase();
   const subGenreLabel = story.genre && story.subGenre && SUBGENRES_MAP[story.genre]?.find(sg => sg.value === story.subGenre)?.label;
+  const targetAudienceLabel = story.targetAudience && TARGET_AUDIENCES.find(ta => ta.value === story.targetAudience)?.label;
+  const lengthLabel = story.length && STORY_LENGTHS.find(sl => sl.value === story.length)?.label;
 
   return (
     <Card
@@ -66,6 +68,24 @@ export function StoryCard({ story, priorityImage = false, large = false }: Story
                     {subGenreLabel}
                 </Badge>
             )}
+             {targetAudienceLabel && (
+                <Badge
+                    variant="outline"
+                    className="border-blue-500/50 text-blue-700/90 bg-blue-500/10 font-medium px-2.5 py-0.5 text-xs shadow-sm"
+                >
+                    <Users className="w-3 h-3 mr-1.5" />
+                    {targetAudienceLabel}
+                </Badge>
+            )}
+            {lengthLabel && (
+                 <Badge
+                    variant="outline"
+                    className="border-green-500/50 text-green-700/90 bg-green-500/10 font-medium px-2.5 py-0.5 text-xs shadow-sm"
+                >
+                    <Clock className="w-3 h-3 mr-1.5" />
+                    {lengthLabel.split('(')[0].trim()} {/* Sadece "Kısa", "Orta", "Uzun" kısmını al */}
+                </Badge>
+            )}
         </div>
         <CardTitle className={`font-bold mb-3 leading-tight ${large ? 'text-2xl md:text-3xl' : 'text-xl md:text-2xl'}`}>
           <Link href={`/story/${story.id}`} className="hover:text-primary transition-colors duration-200 group-hover:text-primary">
@@ -94,5 +114,3 @@ export function StoryCard({ story, priorityImage = false, large = false }: Story
     </Card>
   );
 }
-
-    

@@ -6,14 +6,14 @@ import Image from 'next/image';
 import { getStoryById, getStories } from '@/lib/mock-db';
 import type { Story } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Loader2, BookText, Sparkles } from 'lucide-react'; 
+import { ArrowLeft, Loader2, BookText, Sparkles, Users, Clock, Tag } from 'lucide-react'; 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { StoryCard } from '@/components/site/StoryCard';
 import { Header } from '@/components/site/Header';
 import { Footer } from '@/components/site/Footer';
 import { Separator } from '@/components/ui/separator';
-import { APP_NAME, SUBGENRES_MAP } from '@/lib/constants';
+import { APP_NAME, SUBGENRES_MAP, TARGET_AUDIENCES, STORY_LENGTHS } from '@/lib/constants';
 
 
 function RelatedStories({ currentStoryId, currentGenre }: { currentStoryId: string; currentGenre: Story['genre'] }) {
@@ -123,6 +123,8 @@ export default function StoryPage() {
   const paragraphs = story.content.split('\n').filter(p => p.trim() !== '');
   const capitalizedGenre = story.genre.charAt(0).toUpperCase() + story.genre.slice(1).toLowerCase();
   const subGenreLabel = story.genre && story.subGenre && SUBGENRES_MAP[story.genre]?.find(sg => sg.value === story.subGenre)?.label;
+  const targetAudienceLabel = story.targetAudience && TARGET_AUDIENCES.find(ta => ta.value === story.targetAudience)?.label;
+  const lengthLabel = story.length && STORY_LENGTHS.find(sl => sl.value === story.length)?.label;
 
   return (
     <>
@@ -147,6 +149,18 @@ export default function StoryPage() {
                     <Badge variant="outline" className="border-primary/50 text-primary/90 bg-primary/10">
                          <BookText className="w-3 h-3 mr-1.5" />
                         {subGenreLabel}
+                    </Badge>
+                )}
+                {targetAudienceLabel && (
+                    <Badge variant="outline" className="border-blue-500/50 text-blue-700/90 bg-blue-500/10">
+                         <Users className="w-3 h-3 mr-1.5" />
+                        {targetAudienceLabel}
+                    </Badge>
+                )}
+                {lengthLabel && (
+                    <Badge variant="outline" className="border-green-500/50 text-green-700/90 bg-green-500/10">
+                         <Clock className="w-3 h-3 mr-1.5" />
+                        {lengthLabel}
                     </Badge>
                 )}
             </div>
@@ -188,5 +202,3 @@ export default function StoryPage() {
     </>
   );
 }
-
-    

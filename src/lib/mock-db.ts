@@ -1,7 +1,7 @@
 
 import type { Story, StoryGenre, ScheduledGeneration, ScheduledGenerationStatus, WeeklyScheduleItem, DayOfWeek, StorySubGenre } from '@/lib/types';
 import { isValid, parseISO, format } from 'date-fns'; 
-import { SUBGENRES_MAP } from './constants'; // Import SUBGENRES_MAP
+import { SUBGENRES_MAP, STORY_LENGTHS, TARGET_AUDIENCES } from './constants';
 
 const STORIES_KEY = 'dusbox_stories';
 const SCHEDULED_GENERATIONS_KEY = 'dusbox_scheduledGenerations';
@@ -22,10 +22,12 @@ const initialStoriesData: Story[] = [
     summary: '',
     imageUrl: 'https://placehold.co/600x480.png',
     genre: 'Macera',
-    subGenre: SUBGENRES_MAP['Macera']?.[3]?.value || 'fantastik-dunyalar', // Fantastik Dünyalar
+    subGenre: SUBGENRES_MAP['Macera']?.[3]?.value || 'fantastik-dunyalar',
     status: 'published',
     createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
     publishedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    length: STORY_LENGTHS[1].value, // orta
+    targetAudience: TARGET_AUDIENCES[2].value, // Genç (11-18 Yaş)
   },
   {
     id: '2',
@@ -34,10 +36,12 @@ const initialStoriesData: Story[] = [
     summary: '',
     imageUrl: 'https://placehold.co/600x480.png',
     genre: 'Bilim Kurgu',
-    subGenre: SUBGENRES_MAP['Bilim Kurgu']?.[0]?.value || 'uzay-maceralari', // Uzay Maceraları
+    subGenre: SUBGENRES_MAP['Bilim Kurgu']?.[0]?.value || 'uzay-maceralari',
     status: 'published',
     createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
     publishedAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
+    length: STORY_LENGTHS[2].value, // uzun
+    targetAudience: TARGET_AUDIENCES[3].value, // Yetişkin (18+)
   },
   {
     id: '3',
@@ -46,9 +50,10 @@ const initialStoriesData: Story[] = [
     summary: '',
     imageUrl: 'https://placehold.co/600x480.png',
     genre: 'Romantik',
-    // No subGenre for this one initially
     status: 'pending',
     createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+    length: STORY_LENGTHS[1].value, // orta
+    targetAudience: TARGET_AUDIENCES[4].value, // Aile
   },
   {
     id: '4',
@@ -57,9 +62,11 @@ const initialStoriesData: Story[] = [
     summary: '',
     imageUrl: 'https://placehold.co/600x480.png',
     genre: 'Korku',
-    subGenre: SUBGENRES_MAP['Korku']?.[0]?.value || 'hayalet-hikayeleri', // Hayalet Hikayeleri
+    subGenre: SUBGENRES_MAP['Korku']?.[0]?.value || 'hayalet-hikayeleri',
     status: 'awaiting_approval', 
     createdAt: new Date().toISOString(),
+    length: STORY_LENGTHS[0].value, // kısa
+    targetAudience: TARGET_AUDIENCES[1].value, // Çocuk (7-10 Yaş)
   }
 ].map(story => ({ ...story, summary: generateSummary(story.content) }));
 
@@ -106,17 +113,20 @@ export const getStoryById = async (id: string): Promise<Story | undefined> => {
 
 export const addStory = async (storyData: Story): Promise<Story> => {
   let stories = await getStories();
-  const newStoryWithSummary = {
+  const newStoryWithDefaults = {
     ...storyData, 
-    summary: storyData.summary || generateSummary(storyData.content), // Ensure summary if not provided
+    id: storyData.id, // Use provided ID
+    summary: storyData.summary || generateSummary(storyData.content),
     status: storyData.status || 'awaiting_approval',
     createdAt: storyData.createdAt || new Date().toISOString(),
-    subGenre: storyData.subGenre, // Make sure subGenre is carried over
+    subGenre: storyData.subGenre,
+    length: storyData.length,
+    targetAudience: storyData.targetAudience,
   };
-  stories.unshift(newStoryWithSummary);
+  stories.unshift(newStoryWithDefaults);
   saveToLocalStorage(STORIES_KEY, stories);
-  console.log('[DB AddStory] Added story:', newStoryWithSummary.id, 'Status:', newStoryWithSummary.status, 'SubGenre:', newStoryWithSummary.subGenre);
-  return JSON.parse(JSON.stringify(newStoryWithSummary));
+  console.log('[DB AddStory] Added story:', newStoryWithDefaults.id, 'Details:', newStoryWithDefaults);
+  return JSON.parse(JSON.stringify(newStoryWithDefaults));
 };
 
 
@@ -128,30 +138,28 @@ export const updateStory = async (id: string, updates: Partial<Omit<Story, 'id'>
     return undefined;
   }
   
-  // Preserve subGenre if only genre is being updated and new genre doesn't have that subGenre,
-  // or if subGenre is explicitly being set to undefined (cleared).
   let subGenreToApply = updates.subGenre;
-  if (updates.hasOwnProperty('subGenre')) { // If subGenre is part of the updates object
-    subGenreToApply = updates.subGenre; // Use the value from updates (could be undefined to clear it)
+  if (updates.hasOwnProperty('subGenre')) { 
+    subGenreToApply = updates.subGenre; 
   } else if (updates.genre && updates.genre !== stories[storyIndex].genre) {
-    // If main genre changes AND subGenre is NOT in updates, clear subGenre.
     subGenreToApply = undefined;
   } else {
-    // Otherwise, keep the existing subGenre.
     subGenreToApply = stories[storyIndex].subGenre;
   }
 
   stories[storyIndex] = { 
       ...stories[storyIndex], 
       ...updates,
-      subGenre: subGenreToApply
+      subGenre: subGenreToApply,
+      length: updates.length !== undefined ? updates.length : stories[storyIndex].length,
+      targetAudience: updates.targetAudience !== undefined ? updates.targetAudience : stories[storyIndex].targetAudience,
   };
 
   if (updates.content && (!updates.summary || updates.summary === stories[storyIndex].summary)) {
     stories[storyIndex].summary = generateSummary(updates.content);
   }
   saveToLocalStorage(STORIES_KEY, stories);
-  console.log('[DB UpdateStory] Updated story:', id, 'New Status:', stories[storyIndex].status, 'Updates:', updates, 'Final SubGenre:', stories[storyIndex].subGenre);
+  console.log('[DB UpdateStory] Updated story:', id, 'New Status:', stories[storyIndex].status, 'Updates:', updates);
   return JSON.parse(JSON.stringify(stories[storyIndex]));
 };
 
@@ -163,7 +171,6 @@ export const deleteStoryById = async (id: string): Promise<boolean> => {
   return stories.length < initialLength;
 };
 
-// Scheduled Generations
 const sortScheduledGenerations = (items: ScheduledGeneration[]): ScheduledGeneration[] => {
   return [...items].sort((a, b) => {
     const aDateValid = a.scheduledDate && a.scheduledTime;
@@ -197,21 +204,27 @@ export const getScheduledGenerations = async (): Promise<ScheduledGeneration[]> 
 };
 
 export const addScheduledGeneration = async (
-  data: ScheduledGeneration
+  data: Omit<ScheduledGeneration, 'id' | 'status' | 'createdAt'>
 ): Promise<{ newScheduledGeneration: ScheduledGeneration; allItems: ScheduledGeneration[] }> => {
-  let items = getFromLocalStorage<ScheduledGeneration[]>(SCHEDULED_GENERATIONS_KEY, []); // Fetch unsorted items
-  items.push(data); 
-  saveToLocalStorage(SCHEDULED_GENERATIONS_KEY, items); 
+  let items = getFromLocalStorage<ScheduledGeneration[]>(SCHEDULED_GENERATIONS_KEY, []);
+  const newScheduledItem: ScheduledGeneration = {
+    ...data,
+    id: `sg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+  };
+  items.push(newScheduledItem);
+  saveToLocalStorage(SCHEDULED_GENERATIONS_KEY, items);
   
   const allCurrentItems = getFromLocalStorage<ScheduledGeneration[]>(SCHEDULED_GENERATIONS_KEY, []);
-  return { 
-    newScheduledGeneration: JSON.parse(JSON.stringify(data)), 
-    allItems: JSON.parse(JSON.stringify(sortScheduledGenerations(allCurrentItems)))
+  return {
+    newScheduledGeneration: JSON.parse(JSON.stringify(newScheduledItem)),
+    allItems: JSON.parse(JSON.stringify(sortScheduledGenerations(allCurrentItems))),
   };
 };
 
 export const updateScheduledGenerationStatus = async (id: string, status: ScheduledGenerationStatus, generatedStoryId?: string, errorMessage?: string): Promise<ScheduledGeneration | undefined> => {
-  let items = getFromLocalStorage<ScheduledGeneration[]>(SCHEDULED_GENERATIONS_KEY, []); // Fetch unsorted
+  let items = getFromLocalStorage<ScheduledGeneration[]>(SCHEDULED_GENERATIONS_KEY, []);
   const index = items.findIndex(sg => sg.id === id);
   if (index === -1) return undefined;
   items[index].status = status;
@@ -245,7 +258,6 @@ export const getScheduledGenerationById = async (id: string): Promise<ScheduledG
   return scheduledItem ? JSON.parse(JSON.stringify(scheduledItem)) : undefined;
 };
 
-// Weekly Recurring Schedules
 export const getWeeklySchedules = async (): Promise<WeeklyScheduleItem[]> => {
   const items = getFromLocalStorage<WeeklyScheduleItem[]>(WEEKLY_SCHEDULES_KEY, []);
    if(items.length === 0 && typeof window !== 'undefined' && !window.localStorage.getItem(WEEKLY_SCHEDULES_KEY)) {
@@ -254,7 +266,7 @@ export const getWeeklySchedules = async (): Promise<WeeklyScheduleItem[]> => {
   return JSON.parse(JSON.stringify(items));
 };
 
-export const upsertWeeklySchedule = async (itemData: WeeklyScheduleItem ): Promise<WeeklyScheduleItem> => {
+export const upsertWeeklySchedule = async (itemData: Omit<WeeklyScheduleItem, 'id' | 'createdAt' | 'updatedAt'> & { id?: string } ): Promise<WeeklyScheduleItem> => {
   let items = await getWeeklySchedules();
   const existingItemIndex = items.findIndex(ws => ws.dayOfWeek === itemData.dayOfWeek && ws.time === itemData.time);
   
@@ -262,7 +274,7 @@ export const upsertWeeklySchedule = async (itemData: WeeklyScheduleItem ): Promi
   if (existingItemIndex > -1) {
     items[existingItemIndex] = {
       ...items[existingItemIndex],
-      ...itemData, 
+      genre: itemData.genre, 
       updatedAt: new Date().toISOString(),
     };
     savedItem = items[existingItemIndex];
@@ -270,7 +282,7 @@ export const upsertWeeklySchedule = async (itemData: WeeklyScheduleItem ): Promi
     savedItem = {
         ...itemData,
         id: itemData.id || `ws-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-        createdAt: itemData.createdAt || new Date().toISOString(),
+        createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
     };
     items.push(savedItem);
@@ -287,7 +299,6 @@ export const deleteWeeklyScheduleByDayTime = async (dayOfWeek: DayOfWeek, time: 
   return items.length < initialLength;
 };
 
-// Helper for weekly schedule check time
 export const getLastWeeklyCheckTime = async (): Promise<string | null> => {
     return getFromLocalStorage<string | null>(LAST_WEEKLY_CHECK_KEY, null);
 }
@@ -296,7 +307,6 @@ export const setLastWeeklyCheckTime = async (time: string): Promise<void> => {
     saveToLocalStorage(LAST_WEEKLY_CHECK_KEY, time);
 }
 
-// Admin Recipient Email for Notifications
 export const getAdminRecipientEmail = async (): Promise<string | null> => {
   return getFromLocalStorage<string | null>(ADMIN_RECIPIENT_EMAIL_KEY, null);
 }
@@ -305,8 +315,6 @@ export const setAdminRecipientEmail = async (email: string): Promise<void> => {
   saveToLocalStorage(ADMIN_RECIPIENT_EMAIL_KEY, email);
 }
 
-
-// Function to ensure initial data is in localStorage
 export const initializeDb = async () => {
   if (typeof window !== 'undefined') {
     if (!window.localStorage.getItem(STORIES_KEY)) {
@@ -335,5 +343,3 @@ export const initializeDb = async () => {
 if (typeof window !== 'undefined') {
   initializeDb();
 }
-
-    

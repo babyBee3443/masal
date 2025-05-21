@@ -8,15 +8,17 @@ import {
   STORY_LENGTHS, 
   STORY_COMPLEXITIES, 
   SUBGENRES_MAP,
+  TARGET_AUDIENCES, // Eklendi
   type StoryLength, 
-  type StoryComplexity 
+  type StoryComplexity,
+  type TargetAudience // Eklendi
 } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { generateNewStoryAction } from '@/lib/actions';
-import { getAdminRecipientEmail } from '@/lib/mock-db'; // Import to get recipient email
+import { getAdminRecipientEmail } from '@/lib/mock-db';
 import { Sparkles, Loader2 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 
@@ -31,6 +33,8 @@ export function GenerateStorySection({ onStoryGenerated }: GenerateStorySectionP
   
   const [selectedLength, setSelectedLength] = useState<StoryLength | undefined>(STORY_LENGTHS[1].value);
   const [selectedComplexity, setSelectedComplexity] = useState<StoryComplexity | undefined>(STORY_COMPLEXITIES[1].value);
+  const [selectedTargetAudience, setSelectedTargetAudience] = useState<TargetAudience | undefined>(undefined); // Yeni state
+  
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
 
@@ -53,19 +57,25 @@ export function GenerateStorySection({ onStoryGenerated }: GenerateStorySectionP
     startTransition(async () => {
       toast({ title: "Hikaye Oluşturuluyor...", description: "Yapay zeka yeni bir masal hazırlıyor, lütfen bekleyin."});
       
-      const adminEmail = await getAdminRecipientEmail(); // Get email from localStorage
+      const adminEmail = await getAdminRecipientEmail();
       
       const result = await generateNewStoryAction(
         selectedGenre, 
         selectedLength, 
         selectedComplexity, 
         selectedSubGenre,
-        adminEmail || undefined // Pass email or undefined
+        selectedTargetAudience, // Yeni parametre gönderiliyor
+        adminEmail || undefined
       );
       if (result.success && result.storyData) {
         toast({ title: 'Hikaye Oluşturuldu!', description: `"${result.storyData.title}" oluşturuldu ve incelenmeyi bekliyor.` });
         onStoryGenerated();
+        // Formu sıfırlama seçenekleri eklenebilir (isteğe bağlı)
         setSelectedGenre(undefined);
+        setSelectedSubGenre(undefined);
+        setSelectedLength(STORY_LENGTHS[1].value);
+        setSelectedComplexity(STORY_COMPLEXITIES[1].value);
+        setSelectedTargetAudience(undefined);
       } else {
         toast({ variant: 'destructive', title: 'Oluşturma Başarısız', description: result.error || 'Hikaye oluşturulamadı.' });
       }
@@ -76,10 +86,10 @@ export function GenerateStorySection({ onStoryGenerated }: GenerateStorySectionP
     <Card className="shadow-lg">
       <CardHeader>
         <CardTitle className="text-2xl">Yeni Hikaye Oluştur</CardTitle>
-        <CardDescription>Bir tür, alt tür, uzunluk ve detay seviyesi seçin ve yapay zekanın yeni bir masal örmesine izin verin.</CardDescription>
+        <CardDescription>Bir tür, alt tür, uzunluk, detay ve hedef kitle seçin ve yapay zekanın yeni bir masal örmesine izin verin.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <div>
             <Label htmlFor="genre-select" className="text-sm font-medium text-muted-foreground block mb-1">Ana Tür</Label>
             <Select value={selectedGenre} onValueChange={(value) => setSelectedGenre(value as StoryGenre)} disabled={isPending}>
@@ -129,6 +139,18 @@ export function GenerateStorySection({ onStoryGenerated }: GenerateStorySectionP
               </SelectTrigger>
               <SelectContent>
                 {STORY_COMPLEXITIES.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="target-audience-select" className="text-sm font-medium text-muted-foreground block mb-1">Hedef Kitle</Label>
+            <Select value={selectedTargetAudience} onValueChange={(value) => setSelectedTargetAudience(value as TargetAudience)} disabled={isPending}>
+              <SelectTrigger id="target-audience-select">
+                <SelectValue placeholder="Hedef kitle seçin (isteğe bağlı)..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Hedef kitle belirtme</SelectItem>
+                {TARGET_AUDIENCES.map(ta => <SelectItem key={ta.value} value={ta.value}>{ta.label}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

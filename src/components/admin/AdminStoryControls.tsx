@@ -4,7 +4,7 @@
 import { useState, useTransition, useEffect } from 'react';
 import Image from 'next/image';
 import type { Story, StoryGenre, StorySubGenre } from '@/lib/types';
-import { GENRES, SUBGENRES_MAP, STORY_LENGTHS, STORY_COMPLEXITIES } from '@/lib/constants';
+import { GENRES, SUBGENRES_MAP, STORY_LENGTHS, STORY_COMPLEXITIES, TARGET_AUDIENCES, StoryLength, TargetAudience } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -22,7 +22,7 @@ import {
     approveStoryAction 
 } from '@/lib/actions';
 import { updateStory as dbUpdateStory, deleteStoryById as dbDeleteStoryById } from '@/lib/mock-db';
-import { CheckCircle, Trash2, RefreshCw, Loader2, CalendarClock, Edit3, ShieldCheck, BookText } from 'lucide-react';
+import { CheckCircle, Trash2, RefreshCw, Loader2, CalendarClock, Edit3, ShieldCheck, BookText, Users, ClockIcon } from 'lucide-react';
 import { format, parseISO, isValid } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import {
@@ -47,6 +47,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 
 
 interface AdminStoryControlsProps {
@@ -73,6 +74,11 @@ export function AdminStoryControls({ story: initialStory, onStoryUpdate }: Admin
   const [selectedSubGenre, setSelectedSubGenre] = useState<StorySubGenre | undefined>(initialStory.subGenre);
   const [availableSubGenres, setAvailableSubGenres] = useState<{ value: StorySubGenre; label: string }[]>([]);
 
+  // Yeni state'ler eklendi
+  const [editableLength, setEditableLength] = useState<StoryLength | undefined>(initialStory.length);
+  const [editableTargetAudience, setEditableTargetAudience] = useState<TargetAudience | undefined>(initialStory.targetAudience);
+
+
   useEffect(() => {
     setStory(initialStory);
     setScheduledDate(initialStory.scheduledAtDate && isValid(parseISO(initialStory.scheduledAtDate)) ? parseISO(initialStory.scheduledAtDate) : undefined);
@@ -81,7 +87,9 @@ export function AdminStoryControls({ story: initialStory, onStoryUpdate }: Admin
     setEditableContent(initialStory.content);
     setSelectedMainGenre(initialStory.genre);
     setSelectedSubGenre(initialStory.subGenre);
-    // Initial load of subgenres
+    setEditableLength(initialStory.length);
+    setEditableTargetAudience(initialStory.targetAudience);
+
     if (initialStory.genre && SUBGENRES_MAP[initialStory.genre]) {
       setAvailableSubGenres(SUBGENRES_MAP[initialStory.genre]);
     } else {
@@ -90,11 +98,9 @@ export function AdminStoryControls({ story: initialStory, onStoryUpdate }: Admin
     setIsEditing(false); 
   }, [initialStory]);
 
-  // Update available subgenres when the main genre (selectedMainGenre) changes
   useEffect(() => {
     if (selectedMainGenre && SUBGENRES_MAP[selectedMainGenre]) {
       setAvailableSubGenres(SUBGENRES_MAP[selectedMainGenre]);
-      // If the current subgenre is not valid for the new main genre, reset it.
       if (selectedSubGenre && !SUBGENRES_MAP[selectedMainGenre].find(sg => sg.value === selectedSubGenre)) {
         setSelectedSubGenre(undefined); 
       }
@@ -146,40 +152,20 @@ export function AdminStoryControls({ story: initialStory, onStoryUpdate }: Admin
 
   const handleMainGenreChange = (newMainGenreValue: StoryGenre) => {
     setSelectedMainGenre(newMainGenreValue);
-    // When main genre changes, reset subGenre as its options will change.
-    // The actual update to the story will happen when subGenre is selected or if it's left as "none".
-    // We trigger an update with the new main genre and a cleared subgenre.
-    // If the user then selects a subgenre, another update will occur.
     setSelectedSubGenre(undefined); 
-    handleCategoryUpdate(newMainGenreValue, undefined);
+    // Sadece ana tür değiştiğinde kategori güncelleme çağrısını şimdilik erteliyoruz,
+    // alt tür seçildiğinde veya düzenleme kaydedildiğinde toplu güncelleme yapacağız.
+    // handleCategoryUpdate(newMainGenreValue, undefined); 
   };
 
   const handleSubGenreChange = (newSubGenreValue: StorySubGenre | 'none') => {
     const finalSubGenre = newSubGenreValue === 'none' ? undefined : newSubGenreValue;
     setSelectedSubGenre(finalSubGenre);
-    handleCategoryUpdate(selectedMainGenre, finalSubGenre);
+    // handleCategoryUpdate(selectedMainGenre, finalSubGenre);
   };
   
-  const handleCategoryUpdate = (genreToUpdate: StoryGenre, subGenreToUpdate?: StorySubGenre) => {
-    startTransition(async () => {
-      const actionResult = await updateStoryCategoryAction(story.id, genreToUpdate, subGenreToUpdate);
-      if (actionResult.success && actionResult.storyDataToUpdate) {
-        await dbUpdateStory(story.id, actionResult.storyDataToUpdate); // This will update the local state via onStoryUpdate
-        
-        let toastMessage = `"${story.title}" hikayesinin ana türü ${genreToUpdate} olarak değiştirildi.`;
-        const subGenreLabel = subGenreToUpdate && SUBGENRES_MAP[genreToUpdate]?.find(sg => sg.value === subGenreToUpdate)?.label;
-        if (subGenreLabel) {
-          toastMessage += ` Alt türü ${subGenreLabel} olarak ayarlandı.`;
-        } else {
-          toastMessage += ` Alt türü temizlendi.`;
-        }
-        toast({ title: 'Kategori Güncellendi', description: toastMessage });
-        onStoryUpdate();
-      } else {
-        toast({ variant: 'destructive', title: 'Kategori Güncelleme Hatası', description: actionResult.error });
-      }
-    });
-  };
+  // Bu fonksiyon artık doğrudan çağrılmayacak, saveEdits içinde kullanılacak.
+  // const handleCategoryUpdate = (genreToUpdate: StoryGenre, subGenreToUpdate?: StorySubGenre) => { ... }
 
 
   const handleRegenerateImage = () => {
@@ -217,7 +203,26 @@ export function AdminStoryControls({ story: initialStory, onStoryUpdate }: Admin
   
   const handleSaveEdits = () => {
     startTransition(async () => {
-        const updatedStory = await dbUpdateStory(story.id, { title: editableTitle, content: editableContent });
+        const updatesToSave: Partial<Story> = { 
+            title: editableTitle, 
+            content: editableContent,
+            genre: selectedMainGenre, // Ana türü de güncelle
+            subGenre: selectedSubGenre, // Alt türü de güncelle
+            length: editableLength,
+            targetAudience: editableTargetAudience
+        };
+        
+        // Kategori güncelleme eylemini çağırabiliriz (eğer ayrı bir eylem varsa)
+        // Veya doğrudan dbUpdateStory ile tüm değişiklikleri kaydedebiliriz.
+        // Şimdilik dbUpdateStory kullanıyoruz.
+        // Eğer updateStoryCategoryAction hem genre hem subGenre alıyorsa, onu da çağırabiliriz.
+        // const categoryActionResult = await updateStoryCategoryAction(story.id, selectedMainGenre, selectedSubGenre);
+        // if (!categoryActionResult.success) {
+        //     toast({ variant: "destructive", title: "Kategori Güncelleme Başarısız", description: categoryActionResult.error});
+        //     return;
+        // }
+
+        const updatedStory = await dbUpdateStory(story.id, updatesToSave);
         if (updatedStory) {
             toast({ title: "Hikaye Güncellendi", description: `"${updatedStory.title}" başarıyla güncellendi.`});
             setIsEditing(false);
@@ -283,7 +288,8 @@ export function AdminStoryControls({ story: initialStory, onStoryUpdate }: Admin
   };
 
   const currentSubGenreLabel = story.genre && story.subGenre && SUBGENRES_MAP[story.genre]?.find(sg => sg.value === story.subGenre)?.label;
-
+  const currentTargetAudienceLabel = story.targetAudience && TARGET_AUDIENCES.find(ta => ta.value === story.targetAudience)?.label;
+  const currentLengthLabel = story.length && STORY_LENGTHS.find(sl => sl.value === story.length)?.label;
 
   return (
     <Card className="w-full shadow-lg animate-fadeIn">
@@ -298,18 +304,23 @@ export function AdminStoryControls({ story: initialStory, onStoryUpdate }: Admin
         ) : (
             <CardTitle className="text-2xl">{story.title}</CardTitle>
         )}
-        <CardDescription>
-          Durum: <span className={`font-semibold ${statusInfo.color}`}>{statusInfo.text}</span>
-          <span className="mx-2">|</span>
-          Ana Tür: {story.genre}
-          {currentSubGenreLabel && (<><span className="mx-2">|</span> Alt Tür: <span className="font-medium text-foreground/80">{currentSubGenreLabel}</span></>)}
-          <br />
-          Oluşturulma: {formatSimpleDate(story.createdAt)}
+        <CardDescription className="space-y-1">
+          <div>
+            Durum: <span className={`font-semibold ${statusInfo.color}`}>{statusInfo.text}</span>
+            <span className="mx-1">|</span>
+            Ana Tür: {story.genre}
+            {currentSubGenreLabel && (<><span className="mx-1">|</span> Alt Tür: <Badge variant="outline" className="ml-1 text-xs">{currentSubGenreLabel}</Badge></>)}
+          </div>
+          <div>
+            {currentTargetAudienceLabel && (<>Hedef Kitle: <Badge variant="outline" className="text-xs">{currentTargetAudienceLabel}</Badge><span className="mx-1">|</span></>)}
+            {currentLengthLabel && (<>Uzunluk: <Badge variant="outline" className="text-xs">{currentLengthLabel}</Badge><span className="mx-1">|</span></>)}
+            Oluşturulma: {formatSimpleDate(story.createdAt)}
+          </div>
           {story.status === 'published' && story.publishedAt && (
-            <> | Yayınlanma: {formatSimpleDate(story.publishedAt)}</>
+            <div>Yayınlanma: {formatSimpleDate(story.publishedAt)}</div>
           )}
            {story.status === 'pending' && story.scheduledAtDate && (
-            <> | Planlanan Yayın: <span className="font-semibold text-blue-600">{formatDateDisplay(story.scheduledAtDate, story.scheduledAtTime)}</span></>
+            <div>Planlanan Yayın: <span className="font-semibold text-blue-600">{formatDateDisplay(story.scheduledAtDate, story.scheduledAtTime)}</span></div>
           )}
         </CardDescription>
       </CardHeader>
@@ -330,58 +341,81 @@ export function AdminStoryControls({ story: initialStory, onStoryUpdate }: Admin
           </Button>
         </div>
         <div className="md:col-span-2 space-y-4">
-          <div>
-            <Label htmlFor={`summary-${story.id}`} className="text-sm font-medium text-muted-foreground block mb-1">Özet (Otomatik)</Label>
-             <Textarea
-                id={`summary-${story.id}`}
-                value={story.summary}
-                readOnly
-                className="h-24 bg-muted/50"
-              />
-          </div>
-           <div>
-            <Label htmlFor={`content-${story.id}`} className="text-sm font-medium text-muted-foreground block mb-1">Tam İçerik</Label>
-             <Textarea
-                id={`content-${story.id}`}
-                value={isEditing ? editableContent : story.content}
-                readOnly={!isEditing || isProcessing}
-                onChange={isEditing ? (e) => setEditableContent(e.target.value) : undefined}
-                className={`h-40 ${isEditing ? 'bg-background' : 'bg-muted/50'}`}
-              />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-                <Label htmlFor={`main-genre-${story.id}`} className="text-sm font-medium text-muted-foreground block mb-1">Ana Tür</Label>
+          {isEditing ? (
+            <>
+              <div>
+                <Label htmlFor={`main-genre-edit-${story.id}`} className="text-sm font-medium text-muted-foreground block mb-1">Ana Tür</Label>
                 <Select 
                     value={selectedMainGenre} 
                     onValueChange={(value) => handleMainGenreChange(value as StoryGenre)} 
-                    disabled={isProcessing || isEditing || story.status === 'published'}
+                    disabled={isProcessing}
                 >
-                <SelectTrigger id={`main-genre-${story.id}`} className="w-full">
+                <SelectTrigger id={`main-genre-edit-${story.id}`} className="w-full">
                     <SelectValue placeholder="Ana tür seçin" />
                 </SelectTrigger>
                 <SelectContent>
                     {GENRES.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
                 </SelectContent>
                 </Select>
-            </div>
-            <div>
-                <Label htmlFor={`sub-genre-${story.id}`} className="text-sm font-medium text-muted-foreground block mb-1">Alt Tür</Label>
-                <Select
-                    value={selectedSubGenre || "none"}
-                    onValueChange={(value) => handleSubGenreChange(value as StorySubGenre | 'none')}
-                    disabled={isProcessing || isEditing || story.status === 'published' || availableSubGenres.length === 0}
-                >
-                    <SelectTrigger id={`sub-genre-${story.id}`} className="w-full">
-                        <SelectValue placeholder={availableSubGenres.length > 0 ? "Alt tür seçin..." : "Alt tür yok"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="none">Alt tür yok / Temizle</SelectItem>
-                        {availableSubGenres.map(sg => <SelectItem key={sg.value} value={sg.value}>{sg.label}</SelectItem>)}
-                    </SelectContent>
+              </div>
+              <div>
+                  <Label htmlFor={`sub-genre-edit-${story.id}`} className="text-sm font-medium text-muted-foreground block mb-1">Alt Tür</Label>
+                  <Select
+                      value={selectedSubGenre || "none"}
+                      onValueChange={(value) => handleSubGenreChange(value as StorySubGenre | 'none')}
+                      disabled={isProcessing || availableSubGenres.length === 0}
+                  >
+                      <SelectTrigger id={`sub-genre-edit-${story.id}`} className="w-full">
+                          <SelectValue placeholder={availableSubGenres.length > 0 ? "Alt tür seçin..." : "Bu ana tür için alt tür yok"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                          <SelectItem value="none">Alt tür yok / Temizle</SelectItem>
+                          {availableSubGenres.map(sg => <SelectItem key={sg.value} value={sg.value}>{sg.label}</SelectItem>)}
+                      </SelectContent>
+                  </Select>
+              </div>
+              <div>
+                <Label htmlFor={`length-edit-${story.id}`} className="text-sm font-medium text-muted-foreground block mb-1">Uzunluk</Label>
+                <Select value={editableLength} onValueChange={(value) => setEditableLength(value as StoryLength)} disabled={isProcessing}>
+                  <SelectTrigger id={`length-edit-${story.id}`}> <SelectValue placeholder="Uzunluk seçin..." /> </SelectTrigger>
+                  <SelectContent>
+                    {STORY_LENGTHS.map(l => <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>)}
+                  </SelectContent>
                 </Select>
-            </div>
-          </div>
+              </div>
+              <div>
+                <Label htmlFor={`target-audience-edit-${story.id}`} className="text-sm font-medium text-muted-foreground block mb-1">Hedef Kitle</Label>
+                <Select value={editableTargetAudience} onValueChange={(value) => setEditableTargetAudience(value as TargetAudience)} disabled={isProcessing}>
+                  <SelectTrigger id={`target-audience-edit-${story.id}`}> <SelectValue placeholder="Hedef kitle seçin..." /> </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Belirtilmemiş</SelectItem>
+                    {TARGET_AUDIENCES.map(ta => <SelectItem key={ta.value} value={ta.value}>{ta.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor={`content-edit-${story.id}`} className="text-sm font-medium text-muted-foreground block mb-1">Tam İçerik</Label>
+                <Textarea
+                    id={`content-edit-${story.id}`}
+                    value={editableContent}
+                    onChange={(e) => setEditableContent(e.target.value)}
+                    className="h-40 bg-background"
+                    disabled={isProcessing}
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <Label htmlFor={`summary-${story.id}`} className="text-sm font-medium text-muted-foreground block mb-1">Özet (Otomatik)</Label>
+                <Textarea id={`summary-${story.id}`} value={story.summary} readOnly className="h-24 bg-muted/50"/>
+              </div>
+              <div>
+                <Label htmlFor={`content-${story.id}`} className="text-sm font-medium text-muted-foreground block mb-1">Tam İçerik</Label>
+                <Textarea id={`content-${story.id}`} value={story.content} readOnly className="h-40 bg-muted/50"/>
+              </div>
+            </>
+          )}
         </div>
       </CardContent>
       <CardFooter className="flex flex-wrap justify-between items-center gap-2">
@@ -391,12 +425,20 @@ export function AdminStoryControls({ story: initialStory, onStoryUpdate }: Admin
                 <Button onClick={handleSaveEdits} disabled={isProcessing} variant="default">
                     {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4"/>} Kaydet
                 </Button>
-                <Button onClick={() => { setIsEditing(false); setEditableTitle(story.title); setEditableContent(story.content);}} variant="outline" disabled={isProcessing}>
+                <Button onClick={() => { 
+                    setIsEditing(false); 
+                    setEditableTitle(story.title); 
+                    setEditableContent(story.content);
+                    setSelectedMainGenre(story.genre);
+                    setSelectedSubGenre(story.subGenre);
+                    setEditableLength(story.length);
+                    setEditableTargetAudience(story.targetAudience);
+                }} variant="outline" disabled={isProcessing}>
                     İptal
                 </Button>
             </div>
         ) : (
-             <Button onClick={() => setIsEditing(true)} variant="outline" disabled={isProcessing || story.status === 'published' || story.status === 'awaiting_approval'}>
+             <Button onClick={() => setIsEditing(true)} variant="outline" disabled={isProcessing || story.status === 'published' }>
                 <Edit3 className="mr-2 h-4 w-4" /> Düzenle
             </Button>
         )}
@@ -514,5 +556,3 @@ export function AdminStoryControls({ story: initialStory, onStoryUpdate }: Admin
     </Card>
   );
 }
-
-    

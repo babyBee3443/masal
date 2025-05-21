@@ -1,23 +1,20 @@
 
-'use client'; // Add 'use client' for localStorage access
+'use client'; 
 import { useEffect, useState } from 'react';
-import { notFound, useParams } from 'next/navigation'; // useParams for client component
+import { useParams } from 'next/navigation'; 
 import Image from 'next/image';
 import { getStoryById, getStories } from '@/lib/mock-db';
 import type { Story } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Loader2 } from 'lucide-react'; // Added Loader2
+import { ArrowLeft, Loader2, BookText, Sparkles } from 'lucide-react'; 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { StoryCard } from '@/components/site/StoryCard';
 import { Header } from '@/components/site/Header';
 import { Footer } from '@/components/site/Footer';
 import { Separator } from '@/components/ui/separator';
-import { APP_NAME } from '@/lib/constants';
+import { APP_NAME, SUBGENRES_MAP } from '@/lib/constants';
 
-// generateStaticParams and generateMetadata are server-side features
-// and won't work directly with localStorage as the primary data source
-// during build time. These pages will be more dynamic.
 
 function RelatedStories({ currentStoryId, currentGenre }: { currentStoryId: string; currentGenre: Story['genre'] }) {
   const [relatedStories, setRelatedStories] = useState<Story[]>([]);
@@ -78,7 +75,7 @@ export default function StoryPage() {
   const params = useParams();
   const id = params.id as string;
 
-  const [story, setStory] = useState<Story | null | undefined>(undefined); // undefined for loading state
+  const [story, setStory] = useState<Story | null | undefined>(undefined); 
 
   useEffect(() => {
     const fetchStory = async () => {
@@ -88,7 +85,7 @@ export default function StoryPage() {
           setStory(fetchedStory);
           document.title = `${fetchedStory.title} | ${APP_NAME}`;
         } else {
-          setStory(null); // Story not found or not published
+          setStory(null); 
           document.title = `Hikaye Bulunamadı | ${APP_NAME}`;
         }
       }
@@ -96,7 +93,7 @@ export default function StoryPage() {
     fetchStory();
   }, [id]);
 
-  if (story === undefined) { // Loading state
+  if (story === undefined) { 
     return (
       <>
         <Header />
@@ -110,7 +107,6 @@ export default function StoryPage() {
   }
 
   if (!story) {
-    // Instead of notFound(), handle client-side for localStorage approach
     return (
          <>
             <Header />
@@ -126,6 +122,7 @@ export default function StoryPage() {
 
   const paragraphs = story.content.split('\n').filter(p => p.trim() !== '');
   const capitalizedGenre = story.genre.charAt(0).toUpperCase() + story.genre.slice(1).toLowerCase();
+  const subGenreLabel = story.genre && story.subGenre && SUBGENRES_MAP[story.genre]?.find(sg => sg.value === story.subGenre)?.label;
 
   return (
     <>
@@ -134,7 +131,6 @@ export default function StoryPage() {
         <article className="max-w-3xl mx-auto">
           <div className="mb-6 animate-fadeIn">
             <Button variant="outline" asChild>
-              {/* For localStorage, router history might be more reliable if available */}
               <Link href={typeof window !== 'undefined' && document.referrer ? document.referrer : "/"}>
                 <ArrowLeft className="mr-2 h-4 w-4" /> Hikayelere Geri Dön
               </Link>
@@ -142,7 +138,18 @@ export default function StoryPage() {
           </div>
 
           <header className="mb-8 animate-fadeIn" style={{animationDelay: '0.1s'}}>
-            <Badge variant="secondary" className="mb-3 bg-accent/20 text-accent-foreground">{capitalizedGenre}</Badge>
+            <div className="flex flex-wrap gap-2 items-center mb-3">
+                <Badge variant="secondary" className="bg-accent/20 text-accent-foreground">
+                    <Sparkles className="w-3 h-3 mr-1.5 fill-current" />
+                    {capitalizedGenre}
+                </Badge>
+                {subGenreLabel && (
+                    <Badge variant="outline" className="border-primary/50 text-primary/90 bg-primary/10">
+                         <BookText className="w-3 h-3 mr-1.5" />
+                        {subGenreLabel}
+                    </Badge>
+                )}
+            </div>
             <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4 leading-tight">{story.title}</h1>
             {story.publishedAt && (
               <p className="text-sm text-muted-foreground">
@@ -160,7 +167,7 @@ export default function StoryPage() {
               className="w-full h-auto rounded-xl object-cover shadow-xl"
               priority
               data-ai-hint="story main illustration"
-              key={story.imageUrl} // Add key to help Next/image detect changes if URL is updated
+              key={story.imageUrl} 
             />
           </div>
 
@@ -181,5 +188,3 @@ export default function StoryPage() {
     </>
   );
 }
-
-    

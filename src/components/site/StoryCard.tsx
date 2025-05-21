@@ -5,7 +5,9 @@ import type { Story } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowRight, Sparkles, BookText } from 'lucide-react'; // Added BookText
+import { SUBGENRES_MAP } from '@/lib/constants';
+
 
 interface StoryCardProps {
   story: Story;
@@ -15,6 +17,8 @@ interface StoryCardProps {
 
 export function StoryCard({ story, priorityImage = false, large = false }: StoryCardProps) {
   const capitalizedGenre = story.genre.charAt(0).toUpperCase() + story.genre.slice(1).toLowerCase();
+  const subGenreLabel = story.genre && story.subGenre && SUBGENRES_MAP[story.genre]?.find(sg => sg.value === story.subGenre)?.label;
+
   return (
     <Card
       className={`
@@ -45,13 +49,24 @@ export function StoryCard({ story, priorityImage = false, large = false }: Story
         </Link>
       </CardHeader>
       <CardContent className="p-5 md:p-6 flex-grow flex flex-col">
-        <Badge
-          variant="secondary"
-          className="mb-3 bg-accent text-accent-foreground font-semibold px-3 py-1 self-start shadow-sm"
-        >
-          <Sparkles className="w-3 h-3 mr-1.5 fill-accent-foreground" />
-          {capitalizedGenre}
-        </Badge>
+        <div className="mb-3 flex flex-wrap gap-2 items-center">
+            <Badge
+            variant="secondary"
+            className="bg-accent text-accent-foreground font-semibold px-3 py-1 self-start shadow-sm"
+            >
+            <Sparkles className="w-3 h-3 mr-1.5 fill-accent-foreground" />
+            {capitalizedGenre}
+            </Badge>
+            {subGenreLabel && (
+                <Badge
+                    variant="outline"
+                    className="border-primary/50 text-primary/90 bg-primary/10 font-medium px-2.5 py-0.5 text-xs shadow-sm"
+                >
+                    <BookText className="w-3 h-3 mr-1.5" />
+                    {subGenreLabel}
+                </Badge>
+            )}
+        </div>
         <CardTitle className={`font-bold mb-3 leading-tight ${large ? 'text-2xl md:text-3xl' : 'text-xl md:text-2xl'}`}>
           <Link href={`/story/${story.id}`} className="hover:text-primary transition-colors duration-200 group-hover:text-primary">
             {story.title}

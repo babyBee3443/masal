@@ -1,16 +1,15 @@
 
-import type { Story, StoryGenre, ScheduledGeneration, ScheduledGenerationStatus, WeeklyScheduleItem, DayOfWeek } from '@/lib/types';
-import { isValid, parseISO, format } from 'date-fns'; // Added format and isValid for direct use here
+import type { Story, StoryGenre, ScheduledGeneration, ScheduledGenerationStatus, WeeklyScheduleItem, DayOfWeek, StorySubGenre } from '@/lib/types';
+import { isValid, parseISO, format } from 'date-fns'; 
 
 const STORIES_KEY = 'dusbox_stories';
 const SCHEDULED_GENERATIONS_KEY = 'dusbox_scheduledGenerations';
 const WEEKLY_SCHEDULES_KEY = 'dusbox_weeklySchedules';
 const LAST_WEEKLY_CHECK_KEY = 'dusbox_lastWeeklyCheck';
-const ADMIN_RECIPIENT_EMAIL_KEY = 'dusbox_adminRecipientEmail'; // New key for admin email
+const ADMIN_RECIPIENT_EMAIL_KEY = 'dusbox_adminRecipientEmail';
 
-// Helper to generate summary
 const generateSummary = (content: string, wordCount: number = 30): string => {
-  const words = content.split(/\s+/); // split by any whitespace
+  const words = content.split(/\s+/);
   return words.slice(0, wordCount).join(' ') + (words.length > wordCount ? '...' : '');
 };
 
@@ -22,6 +21,7 @@ const initialStoriesData: Story[] = [
     summary: '',
     imageUrl: 'https://placehold.co/600x480.png',
     genre: 'Macera',
+    subGenre: 'fantastik-dunyalar',
     status: 'published',
     createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
     publishedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
@@ -33,6 +33,7 @@ const initialStoriesData: Story[] = [
     summary: '',
     imageUrl: 'https://placehold.co/600x480.png',
     genre: 'Bilim Kurgu',
+    subGenre: 'uzay-maceralari',
     status: 'published',
     createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
     publishedAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
@@ -54,6 +55,7 @@ const initialStoriesData: Story[] = [
     summary: '',
     imageUrl: 'https://placehold.co/600x480.png',
     genre: 'Korku',
+    subGenre: 'hayalet-hikayeleri',
     status: 'awaiting_approval', 
     createdAt: new Date().toISOString(),
   }
@@ -104,8 +106,10 @@ export const addStory = async (storyData: Story): Promise<Story> => {
   let stories = await getStories();
   // Ensure summary is generated if not provided or content changed
   const newStoryWithSummary = {
-    ...storyData,
+    ...storyData, // storyData already includes id from generateNewStoryAction
     summary: generateSummary(storyData.content),
+    status: storyData.status || 'awaiting_approval', // Ensure status is set
+    createdAt: storyData.createdAt || new Date().toISOString(),
   };
   stories.unshift(newStoryWithSummary);
   saveToLocalStorage(STORIES_KEY, stories);
@@ -122,7 +126,25 @@ export const updateStory = async (id: string, updates: Partial<Omit<Story, 'id'>
     return undefined;
   }
   const originalStory = stories[storyIndex];
-  stories[storyIndex] = { ...originalStory, ...updates };
+  
+  // Preserve subGenre if only genre is being updated and new genre doesn't have that subGenre
+  let subGenreToKeep = updates.subGenre;
+  if (updates.genre && updates.genre !== originalStory.genre) {
+      // If main genre changes, subGenre should ideally be reset or validated.
+      // For now, if subGenre is not explicitly part of 'updates', we clear it.
+      // If it *is* part of updates, we trust it (action should validate).
+      if (updates.subGenre === undefined) { // Only clear if not part of explicit update
+          subGenreToKeep = undefined;
+      }
+  }
+
+
+  stories[storyIndex] = { 
+      ...originalStory, 
+      ...updates,
+      subGenre: subGenreToKeep 
+    };
+
   if (updates.content && (!updates.summary || updates.summary === originalStory.summary)) {
     stories[storyIndex].summary = generateSummary(updates.content);
   }
@@ -173,27 +195,21 @@ export const getScheduledGenerations = async (): Promise<ScheduledGeneration[]> 
 };
 
 export const addScheduledGeneration = async (
-  data: Omit<ScheduledGeneration, 'id' | 'status' | 'createdAt'>
+  data: ScheduledGeneration // Now accepts full ScheduledGeneration object for consistency
 ): Promise<{ newScheduledGeneration: ScheduledGeneration; allItems: ScheduledGeneration[] }> => {
   let items = await getScheduledGenerations();
-  const newScheduledGeneration: ScheduledGeneration = {
-    ...data,
-    id: `sg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-    status: 'pending',
-    createdAt: new Date().toISOString(),
-  };
-  items.push(newScheduledGeneration);
+  items.push(data); // Data already includes id, status, createdAt from action
   saveToLocalStorage(SCHEDULED_GENERATIONS_KEY, items); 
   
   const allCurrentItems = getFromLocalStorage<ScheduledGeneration[]>(SCHEDULED_GENERATIONS_KEY, []);
   return { 
-    newScheduledGeneration: JSON.parse(JSON.stringify(newScheduledGeneration)), 
+    newScheduledGeneration: JSON.parse(JSON.stringify(data)), 
     allItems: JSON.parse(JSON.stringify(sortScheduledGenerations(allCurrentItems)))
   };
 };
 
 export const updateScheduledGenerationStatus = async (id: string, status: ScheduledGenerationStatus, generatedStoryId?: string, errorMessage?: string): Promise<ScheduledGeneration | undefined> => {
-  let items = await getScheduledGenerations();
+  let items = await getScheduledGenerations(); // Ensures sorted list is fetched if getScheduledGenerations sorts
   const index = items.findIndex(sg => sg.id === id);
   if (index === -1) return undefined;
   items[index].status = status;
@@ -203,9 +219,9 @@ export const updateScheduledGenerationStatus = async (id: string, status: Schedu
   if (errorMessage) {
     items[index].errorMessage = errorMessage;
   } else {
-    delete items[index].errorMessage;
+    delete items[index].errorMessage; // Clear error if status is not 'failed' or no new error
   }
-  saveToLocalStorage(SCHEDULED_GENERATIONS_KEY, items);
+  saveToLocalStorage(SCHEDULED_GENERATIONS_KEY, items); // Save potentially unsorted, but getScheduledGenerations will sort on next read
   console.log('[DB UpdateScheduledGen] Updated:', id, 'Status:', status, 'StoryID:', generatedStoryId, 'Error:', errorMessage);
   return JSON.parse(JSON.stringify(items[index]));
 };
@@ -220,7 +236,7 @@ export const deleteScheduledGenerationById = async (id: string): Promise<boolean
 
 export const getScheduledGenerationById = async (id: string): Promise<ScheduledGeneration | undefined> => {
   if (typeof window === 'undefined') {
-    console.warn("dbGetScheduledGenerationById called on server, cannot access localStorage. Returning undefined.");
+    // console.warn("dbGetScheduledGenerationById called on server, cannot access localStorage. Returning undefined.");
     return undefined; 
   }
   const items = await getScheduledGenerations();
@@ -237,28 +253,27 @@ export const getWeeklySchedules = async (): Promise<WeeklyScheduleItem[]> => {
   return JSON.parse(JSON.stringify(items));
 };
 
-export const upsertWeeklySchedule = async (itemData: Omit<WeeklyScheduleItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<WeeklyScheduleItem> => {
+export const upsertWeeklySchedule = async (itemData: WeeklyScheduleItem ): Promise<WeeklyScheduleItem> => {
   let items = await getWeeklySchedules();
   const existingItemIndex = items.findIndex(ws => ws.dayOfWeek === itemData.dayOfWeek && ws.time === itemData.time);
-  const now = new Date().toISOString();
-
+  
   let savedItem: WeeklyScheduleItem;
   if (existingItemIndex > -1) {
     items[existingItemIndex] = {
       ...items[existingItemIndex],
-      genre: itemData.genre,
-      updatedAt: now,
+      ...itemData, // Update with all new data, including potentially new ID or createdAt if re-saving
+      updatedAt: new Date().toISOString(),
     };
     savedItem = items[existingItemIndex];
   } else {
-    const newItem: WeeklyScheduleItem = {
-      ...itemData,
-      id: `ws-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      createdAt: now,
-      updatedAt: now,
+    // If itemData doesn't have an ID or createdAt (e.g. from action that prepares partial data), add them
+    savedItem = {
+        ...itemData,
+        id: itemData.id || `ws-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        createdAt: itemData.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
     };
-    items.push(newItem);
-    savedItem = newItem;
+    items.push(savedItem);
   }
   saveToLocalStorage(WEEKLY_SCHEDULES_KEY, items);
   return JSON.parse(JSON.stringify(savedItem));
@@ -312,12 +327,11 @@ export const initializeDb = async () => {
     }
     if (!window.localStorage.getItem(ADMIN_RECIPIENT_EMAIL_KEY)) {
       console.log('Initializing admin recipient email in localStorage.');
-      saveToLocalStorage(ADMIN_RECIPIENT_EMAIL_KEY, null); // Initialize as null
+      saveToLocalStorage(ADMIN_RECIPIENT_EMAIL_KEY, null); 
     }
   }
 };
 
-// Call initializeDb when mock-db is loaded on the client-side
 if (typeof window !== 'undefined') {
   initializeDb();
 }

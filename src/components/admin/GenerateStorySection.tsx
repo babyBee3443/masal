@@ -8,10 +8,10 @@ import {
   STORY_LENGTHS, 
   STORY_COMPLEXITIES, 
   SUBGENRES_MAP,
-  TARGET_AUDIENCES, // Eklendi
+  TARGET_AUDIENCES,
   type StoryLength, 
   type StoryComplexity,
-  type TargetAudience // Eklendi
+  type TargetAudience
 } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -33,7 +33,7 @@ export function GenerateStorySection({ onStoryGenerated }: GenerateStorySectionP
   
   const [selectedLength, setSelectedLength] = useState<StoryLength | undefined>(STORY_LENGTHS[1].value);
   const [selectedComplexity, setSelectedComplexity] = useState<StoryComplexity | undefined>(STORY_COMPLEXITIES[1].value);
-  const [selectedTargetAudience, setSelectedTargetAudience] = useState<TargetAudience | undefined>(undefined); // Yeni state
+  const [selectedTargetAudience, setSelectedTargetAudience] = useState<TargetAudience | undefined>(undefined);
   
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
@@ -64,13 +64,12 @@ export function GenerateStorySection({ onStoryGenerated }: GenerateStorySectionP
         selectedLength, 
         selectedComplexity, 
         selectedSubGenre,
-        selectedTargetAudience, // Yeni parametre gönderiliyor
+        selectedTargetAudience,
         adminEmail || undefined
       );
       if (result.success && result.storyData) {
         toast({ title: 'Hikaye Oluşturuldu!', description: `"${result.storyData.title}" oluşturuldu ve incelenmeyi bekliyor.` });
         onStoryGenerated();
-        // Formu sıfırlama seçenekleri eklenebilir (isteğe bağlı)
         setSelectedGenre(undefined);
         setSelectedSubGenre(undefined);
         setSelectedLength(STORY_LENGTHS[1].value);
@@ -144,12 +143,16 @@ export function GenerateStorySection({ onStoryGenerated }: GenerateStorySectionP
           </div>
           <div>
             <Label htmlFor="target-audience-select" className="text-sm font-medium text-muted-foreground block mb-1">Hedef Kitle</Label>
-            <Select value={selectedTargetAudience} onValueChange={(value) => setSelectedTargetAudience(value as TargetAudience)} disabled={isPending}>
+            <Select 
+              value={selectedTargetAudience || ""} 
+              onValueChange={(value) => setSelectedTargetAudience(value === "" ? undefined : value as TargetAudience)} 
+              disabled={isPending}
+            >
               <SelectTrigger id="target-audience-select">
                 <SelectValue placeholder="Hedef kitle seçin (isteğe bağlı)..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Hedef kitle belirtme</SelectItem>
+                {/* <SelectItem value="">Hedef kitle belirtme</SelectItem>  // THIS LINE IS REMOVED */}
                 {TARGET_AUDIENCES.map(ta => <SelectItem key={ta.value} value={ta.value}>{ta.label}</SelectItem>)}
               </SelectContent>
             </Select>

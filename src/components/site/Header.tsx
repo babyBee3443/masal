@@ -1,6 +1,7 @@
 
 'use client';
 
+import React from 'react'; // Ensure React is imported
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
@@ -110,17 +111,13 @@ export function Header() {
 
   const SubCategoryLinkItem = ({ mainGenre, subGenre, isMobile = false }: { mainGenre: StoryGenre; subGenre: { value: string; label: string }; isMobile?: boolean }) => {
     const href = `/categories/${mainGenre}?subGenre=${subGenre.value}`;
-    // Subgenre active state might be more complex if we want to highlight it based on query params
-    // For now, we keep it simple and don't highlight subgenres specifically in the dropdown
-    // const isActive = pathname === href; // This would require more logic for query params
-
     return (
       <Button
         variant="ghost"
         asChild
         className={cn(
           "justify-start font-normal transition-colors hover:text-primary/90 text-foreground/60 hover:bg-accent/10",
-          isMobile ? "w-full py-2 text-sm pl-14" : "text-xs pl-12 py-1.5 h-auto" // Smaller for subcategories
+          isMobile ? "w-full py-2 text-sm pl-14" : "text-xs pl-12 py-1.5 h-auto"
         )}
       >
         <Link href={href} onClick={() => { if (isMobile) setIsMobileMenuOpen(false); }}>
@@ -304,4 +301,3 @@ export function Header() {
     </header>
   );
 }
-

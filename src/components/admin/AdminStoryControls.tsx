@@ -69,6 +69,7 @@ export function AdminStoryControls({ story: initialStory, onStoryUpdate }: Admin
   const [editableTitle, setEditableTitle] = useState(initialStory.title);
   const [editableContent, setEditableContent] = useState(initialStory.content);
 
+  const [selectedMainGenre, setSelectedMainGenre] = useState<StoryGenre>(initialStory.genre);
   const [selectedSubGenre, setSelectedSubGenre] = useState<StorySubGenre | undefined>(initialStory.subGenre);
   const [availableSubGenres, setAvailableSubGenres] = useState<{ value: StorySubGenre; label: string }[]>([]);
 
@@ -78,7 +79,9 @@ export function AdminStoryControls({ story: initialStory, onStoryUpdate }: Admin
     setScheduledTime(initialStory.scheduledAtTime || "10:00");
     setEditableTitle(initialStory.title);
     setEditableContent(initialStory.content);
+    setSelectedMainGenre(initialStory.genre);
     setSelectedSubGenre(initialStory.subGenre);
+    // Initial load of subgenres
     if (initialStory.genre && SUBGENRES_MAP[initialStory.genre]) {
       setAvailableSubGenres(SUBGENRES_MAP[initialStory.genre]);
     } else {
@@ -87,18 +90,19 @@ export function AdminStoryControls({ story: initialStory, onStoryUpdate }: Admin
     setIsEditing(false); 
   }, [initialStory]);
 
+  // Update available subgenres when the main genre (selectedMainGenre) changes
   useEffect(() => {
-    if (story.genre && SUBGENRES_MAP[story.genre]) {
-      setAvailableSubGenres(SUBGENRES_MAP[story.genre]);
+    if (selectedMainGenre && SUBGENRES_MAP[selectedMainGenre]) {
+      setAvailableSubGenres(SUBGENRES_MAP[selectedMainGenre]);
+      // If the current subgenre is not valid for the new main genre, reset it.
+      if (selectedSubGenre && !SUBGENRES_MAP[selectedMainGenre].find(sg => sg.value === selectedSubGenre)) {
+        setSelectedSubGenre(undefined); 
+      }
     } else {
       setAvailableSubGenres([]);
+      setSelectedSubGenre(undefined); 
     }
-    // Ana tür değiştiğinde, seçili alt türün yeni ana türe uygun olup olmadığını kontrol et.
-    // Uygun değilse veya mevcut değilse sıfırla.
-    if (selectedSubGenre && story.genre && SUBGENRES_MAP[story.genre] && !SUBGENRES_MAP[story.genre].find(sg => sg.value === selectedSubGenre)) {
-      setSelectedSubGenre(undefined);
-    }
-  }, [story.genre, selectedSubGenre]);
+  }, [selectedMainGenre, selectedSubGenre]);
 
 
   const handleApprove = () => {
@@ -140,45 +144,41 @@ export function AdminStoryControls({ story: initialStory, onStoryUpdate }: Admin
     });
   };
 
-  const handleCategoryChange = (newGenre: StoryGenre, newSubGenreValue?: StorySubGenre) => {
-    startTransition(async () => {
-      // Eğer sadece alt tür değişiyorsa, ana türü mevcut story.genre olarak al
-      const genreToUpdate = newGenre || story.genre;
-      const subGenreToUpdate = newSubGenreValue !== undefined ? newSubGenreValue : selectedSubGenre;
+  const handleMainGenreChange = (newMainGenreValue: StoryGenre) => {
+    setSelectedMainGenre(newMainGenreValue);
+    // When main genre changes, reset subGenre as its options will change.
+    // The actual update to the story will happen when subGenre is selected or if it's left as "none".
+    // We trigger an update with the new main genre and a cleared subgenre.
+    // If the user then selects a subgenre, another update will occur.
+    setSelectedSubGenre(undefined); 
+    handleCategoryUpdate(newMainGenreValue, undefined);
+  };
 
-      const actionResult = await updateStoryCategoryAction(story.id, genreToUpdate, subGenreToUpdate || undefined);
+  const handleSubGenreChange = (newSubGenreValue: StorySubGenre | 'none') => {
+    const finalSubGenre = newSubGenreValue === 'none' ? undefined : newSubGenreValue;
+    setSelectedSubGenre(finalSubGenre);
+    handleCategoryUpdate(selectedMainGenre, finalSubGenre);
+  };
+  
+  const handleCategoryUpdate = (genreToUpdate: StoryGenre, subGenreToUpdate?: StorySubGenre) => {
+    startTransition(async () => {
+      const actionResult = await updateStoryCategoryAction(story.id, genreToUpdate, subGenreToUpdate);
       if (actionResult.success && actionResult.storyDataToUpdate) {
-        await dbUpdateStory(story.id, actionResult.storyDataToUpdate);
+        await dbUpdateStory(story.id, actionResult.storyDataToUpdate); // This will update the local state via onStoryUpdate
+        
         let toastMessage = `"${story.title}" hikayesinin ana türü ${genreToUpdate} olarak değiştirildi.`;
-        if (subGenreToUpdate) {
-          toastMessage += ` Alt türü ${SUBGENRES_MAP[genreToUpdate]?.find(sg => sg.value === subGenreToUpdate)?.label || subGenreToUpdate} olarak ayarlandı.`;
+        const subGenreLabel = subGenreToUpdate && SUBGENRES_MAP[genreToUpdate]?.find(sg => sg.value === subGenreToUpdate)?.label;
+        if (subGenreLabel) {
+          toastMessage += ` Alt türü ${subGenreLabel} olarak ayarlandı.`;
         } else {
           toastMessage += ` Alt türü temizlendi.`;
         }
         toast({ title: 'Kategori Güncellendi', description: toastMessage });
-        if (newGenre && newGenre !== story.genre) { // Ana tür değiştiyse alt tür seçimini sıfırla
-          setSelectedSubGenre(undefined);
-        } else {
-          setSelectedSubGenre(subGenreToUpdate || undefined);
-        }
         onStoryUpdate();
       } else {
         toast({ variant: 'destructive', title: 'Kategori Güncelleme Hatası', description: actionResult.error });
       }
     });
-  };
-
-  const handleMainGenreChange = (newMainGenre: StoryGenre) => {
-    // Ana tür değiştiğinde, alt türü sıfırla ve yeni alt tür listesini güncelle
-    // Güncellemeyi handleCategoryChange fonksiyonuna bırakıyoruz, o son alt türü de alacak.
-    setSelectedSubGenre(undefined); 
-    setAvailableSubGenres(SUBGENRES_MAP[newMainGenre] || []);
-    handleCategoryChange(newMainGenre, undefined); // Alt türü tanımsız göndererek sıfırlanmasını sağla
-  };
-
-  const handleSubGenreChange = (newSubGenreValue: StorySubGenre) => {
-    setSelectedSubGenre(newSubGenreValue);
-    handleCategoryChange(story.genre, newSubGenreValue === "none" ? undefined : newSubGenreValue);
   };
 
 
@@ -302,7 +302,7 @@ export function AdminStoryControls({ story: initialStory, onStoryUpdate }: Admin
           Durum: <span className={`font-semibold ${statusInfo.color}`}>{statusInfo.text}</span>
           <span className="mx-2">|</span>
           Ana Tür: {story.genre}
-          {currentSubGenreLabel && (<><span className="mx-2">|</span> Alt Tür: {currentSubGenreLabel}</>)}
+          {currentSubGenreLabel && (<><span className="mx-2">|</span> Alt Tür: <span className="font-medium text-foreground/80">{currentSubGenreLabel}</span></>)}
           <br />
           Oluşturulma: {formatSimpleDate(story.createdAt)}
           {story.status === 'published' && story.publishedAt && (
@@ -351,13 +351,13 @@ export function AdminStoryControls({ story: initialStory, onStoryUpdate }: Admin
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-                <Label htmlFor={`category-${story.id}`} className="text-sm font-medium text-muted-foreground block mb-1">Ana Türü Değiştir</Label>
+                <Label htmlFor={`main-genre-${story.id}`} className="text-sm font-medium text-muted-foreground block mb-1">Ana Tür</Label>
                 <Select 
-                    value={story.genre} 
+                    value={selectedMainGenre} 
                     onValueChange={(value) => handleMainGenreChange(value as StoryGenre)} 
                     disabled={isProcessing || isEditing || story.status === 'published'}
                 >
-                <SelectTrigger id={`category-${story.id}`} className="w-full">
+                <SelectTrigger id={`main-genre-${story.id}`} className="w-full">
                     <SelectValue placeholder="Ana tür seçin" />
                 </SelectTrigger>
                 <SelectContent>
@@ -366,13 +366,13 @@ export function AdminStoryControls({ story: initialStory, onStoryUpdate }: Admin
                 </Select>
             </div>
             <div>
-                <Label htmlFor={`subcategory-${story.id}`} className="text-sm font-medium text-muted-foreground block mb-1">Alt Türü Değiştir</Label>
+                <Label htmlFor={`sub-genre-${story.id}`} className="text-sm font-medium text-muted-foreground block mb-1">Alt Tür</Label>
                 <Select
                     value={selectedSubGenre || "none"}
-                    onValueChange={(value) => handleSubGenreChange(value as StorySubGenre)}
+                    onValueChange={(value) => handleSubGenreChange(value as StorySubGenre | 'none')}
                     disabled={isProcessing || isEditing || story.status === 'published' || availableSubGenres.length === 0}
                 >
-                    <SelectTrigger id={`subcategory-${story.id}`} className="w-full">
+                    <SelectTrigger id={`sub-genre-${story.id}`} className="w-full">
                         <SelectValue placeholder={availableSubGenres.length > 0 ? "Alt tür seçin..." : "Alt tür yok"} />
                     </SelectTrigger>
                     <SelectContent>
@@ -514,3 +514,5 @@ export function AdminStoryControls({ story: initialStory, onStoryUpdate }: Admin
     </Card>
   );
 }
+
+    

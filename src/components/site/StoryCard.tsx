@@ -5,7 +5,7 @@ import type { Story } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowRight, Sparkles, BookText } from 'lucide-react'; // Added BookText
+import { ArrowRight, Sparkles, BookText } from 'lucide-react'; 
 import { SUBGENRES_MAP } from '@/lib/constants';
 
 
@@ -94,3 +94,5 @@ export function StoryCard({ story, priorityImage = false, large = false }: Story
     </Card>
   );
 }
+
+    

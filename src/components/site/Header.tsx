@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -24,7 +25,7 @@ import {
 } from '@/components/ui/sheet';
 import { Logo } from '@/components/site/Logo';
 import { cn } from '@/lib/utils';
-import { GENRES, APP_NAME } from '@/lib/constants';
+import { GENRES, APP_NAME, SUBGENRES_MAP } from '@/lib/constants';
 import type { StoryGenre } from '@/lib/types';
 
 
@@ -53,17 +54,15 @@ export function Header() {
 
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 10); // Trigger earlier for consistent background
+      setIsScrolled(window.scrollY > 10);
     };
     window.addEventListener('scroll', handleScroll);
-    handleScroll(); // Check on mount
+    handleScroll();
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
 
   const NavLinkItem = ({ href, label, icon: Icon, exact = false, isMobile = false }: { href: string; label: string; icon: React.ElementType; exact?: boolean; isMobile?: boolean}) => {
-    const isActivePath = exact ? pathname === href : pathname.startsWith(href);
-    // Ensure "Anasayfa" is only active on exact match, but "Kategoriler" is active if path starts with /categories
     const isActive = (exact && pathname === href) || (!exact && href !== '/' && pathname.startsWith(href)) || (href === '/' && pathname === '/');
 
     const baseClasses = "justify-start text-base font-medium transition-all duration-200 ease-out";
@@ -71,14 +70,14 @@ export function Header() {
     const mobileClasses = "w-full py-3 text-lg";
 
     return (
-      <Button 
-        variant="ghost" 
-        asChild 
+      <Button
+        variant="ghost"
+        asChild
         className={cn(
           baseClasses,
           isMobile ? mobileClasses : desktopClasses,
-          isActive 
-            ? (isMobile ? "text-primary font-semibold" : "bg-accent/15 text-accent font-semibold hover:bg-accent/20")
+          isActive
+            ? (isMobile ? "text-primary font-semibold" : "bg-accent/20 text-accent font-semibold hover:bg-accent/25")
             : (isMobile ? "text-foreground/70 hover:text-primary" : "text-foreground/80 hover:bg-accent/10 hover:text-accent")
       )}>
         <Link href={href} onClick={() => {if (isMobile) setIsMobileMenuOpen(false)}}>
@@ -93,13 +92,13 @@ export function Header() {
     const href = `/categories/${genre}`;
     const isActive = pathname === href;
     return (
-       <Button 
-        variant="ghost" 
-        asChild 
+       <Button
+        variant="ghost"
+        asChild
         className={cn(
           "justify-start font-medium transition-colors hover:text-primary",
           isActive ? "text-primary font-semibold" : "text-foreground/70",
-          isMobile ? "w-full py-2.5 text-md pl-10" : "text-sm pl-8" 
+          isMobile ? "w-full py-2.5 text-md pl-10" : "text-sm pl-8"
        )}>
         <Link href={href} onClick={() => {if (isMobile) setIsMobileMenuOpen(false)}}>
           {isMobile && <GenreIcon genre={genre} className="mr-3 h-5 w-5 text-foreground/60 group-hover:text-primary" />}
@@ -109,17 +108,39 @@ export function Header() {
     )
   }
 
+  const SubCategoryLinkItem = ({ mainGenre, subGenre, isMobile = false }: { mainGenre: StoryGenre; subGenre: { value: string; label: string }; isMobile?: boolean }) => {
+    const href = `/categories/${mainGenre}?subGenre=${subGenre.value}`;
+    // Subgenre active state might be more complex if we want to highlight it based on query params
+    // For now, we keep it simple and don't highlight subgenres specifically in the dropdown
+    // const isActive = pathname === href; // This would require more logic for query params
+
+    return (
+      <Button
+        variant="ghost"
+        asChild
+        className={cn(
+          "justify-start font-normal transition-colors hover:text-primary/90 text-foreground/60 hover:bg-accent/10",
+          isMobile ? "w-full py-2 text-sm pl-14" : "text-xs pl-12 py-1.5 h-auto" // Smaller for subcategories
+        )}
+      >
+        <Link href={href} onClick={() => { if (isMobile) setIsMobileMenuOpen(false); }}>
+          <span className="truncate">{subGenre.label}</span>
+        </Link>
+      </Button>
+    );
+  }
+
+
   return (
     <header className={cn(
-      "sticky top-0 z-50 w-full transition-shadow duration-300", // Removed backdrop-blur from here
-      isScrolled ? "bg-background/95 backdrop-blur-md shadow-lg border-b border-border/20" : "bg-transparent border-b border-transparent" 
+      "sticky top-0 z-50 w-full transition-shadow duration-300",
+      isScrolled ? "bg-background/95 backdrop-blur-lg shadow-lg border-b border-border/30" : "bg-transparent border-b border-transparent"
     )}>
       <div className="container mx-auto flex h-20 items-center justify-between px-4 md:px-6">
         <Link href="/" aria-label={`${APP_NAME} Anasayfa`} className="z-10 transform transition-transform duration-300 hover:scale-105">
           <Logo className="h-10 md:h-12 w-auto" />
         </Link>
 
-        {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center space-x-1 lg:space-x-2">
           <NavLinkItem href={mainNavLink.href} label={mainNavLink.label} icon={Home} exact={true} />
 
@@ -128,35 +149,46 @@ export function Header() {
               <Button
                 variant="ghost"
                 className={cn(
-                  "px-4 py-2.5 text-sm font-medium transition-all duration-200 ease-out rounded-lg flex items-center gap-2", // Added flex, items-center, gap-2
-                  pathname.startsWith('/categories') 
-                    ? "bg-accent/15 text-accent font-semibold hover:bg-accent/20" 
+                  "px-4 py-2.5 text-sm font-medium transition-all duration-200 ease-out rounded-lg flex items-center gap-2",
+                  pathname.startsWith('/categories')
+                    ? "bg-accent/20 text-accent font-semibold hover:bg-accent/25"
                     : "text-foreground/80 hover:bg-accent/10 hover:text-accent"
                 )}
               >
-                <LayoutGrid className="h-4 w-4" /> {/* Icon is now direct child */}
+                <LayoutGrid className="h-4 w-4" />
                 Kategoriler
                 <ChevronDown className="ml-1 h-4 w-4 opacity-70 transition-transform group-data-[state=open]:rotate-180" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
-              className="w-[880px] p-6 bg-card/95 backdrop-blur-xl border-2 border-primary/40 shadow-2xl rounded-2xl mt-3"
+              className="w-[880px] p-6 bg-card/90 backdrop-blur-xl border-2 border-primary/40 shadow-2xl rounded-2xl mt-3"
               sideOffset={15}
               align="center"
             >
               <div className="grid grid-cols-3 gap-x-8 gap-y-4">
-                <div className="space-y-2">
-                  <DropdownMenuLabel className="text-lg font-bold text-primary px-2 pb-2.5 mb-3 border-b-2 border-primary/25 flex items-center">
+                <div className="space-y-1">
+                  <DropdownMenuLabel className="text-lg font-bold text-primary px-2 pb-2.5 mb-2 border-b-2 border-primary/25 flex items-center">
                     <Sparkles className="mr-2.5 h-5 w-5 text-accent"/>
                     DüşBox Kategorileri
                   </DropdownMenuLabel>
                   {GENRES.map((genre) => (
-                    <DropdownMenuItem key={genre} asChild className="p-0 group focus:bg-accent/15 rounded-lg">
-                      <Link href={`/categories/${genre}`} className="flex items-center w-full px-3 py-3 text-base rounded-lg text-foreground/90 hover:bg-accent/15 hover:text-accent transition-colors duration-200">
-                        <GenreIcon genre={genre} />
-                        <span className="font-medium">{genre}</span>
-                      </Link>
-                    </DropdownMenuItem>
+                    <React.Fragment key={genre}>
+                      <DropdownMenuItem asChild className="p-0 group focus:bg-accent/15 rounded-lg">
+                        <Link href={`/categories/${genre}`} className="flex items-center w-full px-3 py-2.5 text-base rounded-lg text-foreground/90 hover:bg-accent/15 hover:text-accent transition-colors duration-200">
+                          <GenreIcon genre={genre} />
+                          <span className="font-semibold">{genre}</span>
+                        </Link>
+                      </DropdownMenuItem>
+                      {SUBGENRES_MAP[genre] && SUBGENRES_MAP[genre].length > 0 && (
+                        <div className="flex flex-col pl-5 space-y-0.5 mb-1.5">
+                          {SUBGENRES_MAP[genre].map(subGenre => (
+                            <DropdownMenuItem key={subGenre.value} asChild className="p-0 group focus:bg-accent/10 rounded-md">
+                               <SubCategoryLinkItem mainGenre={genre} subGenre={subGenre} />
+                            </DropdownMenuItem>
+                          ))}
+                        </div>
+                      )}
+                    </React.Fragment>
                   ))}
                 </div>
 
@@ -173,7 +205,7 @@ export function Header() {
                         width={250}
                         height={150}
                         className="w-full h-40 object-cover rounded-md mb-3.5 transition-transform duration-300 group-hover:scale-105"
-                        data-ai-hint="fantasy abstract"
+                        data-ai-hint="futuristic abstract"
                       />
                       <h4 className="text-base font-semibold text-foreground group-hover:text-accent transition-colors px-1">Efsanevi Ejderhanın Sırrı</h4>
                       <p className="text-sm text-muted-foreground mt-1.5 line-clamp-2 px-1">Kadim dağların ardında, efsanevi bir ejderhanın koruduğu bir sır...</p>
@@ -216,7 +248,6 @@ export function Header() {
            <NavLinkItem href={adminPanelLink.href} label={adminPanelLink.label} icon={BookOpen} />
         </nav>
 
-        {/* Mobile Navigation */}
         <div className="md:hidden">
           <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
             <SheetTrigger asChild>
@@ -230,7 +261,7 @@ export function Header() {
                 <Link href="/" onClick={() => setIsMobileMenuOpen(false)}>
                   <Logo className="h-9 w-auto" />
                 </Link>
-                <SheetTitle className="sr-only">Ana Menü</SheetTitle> {/* Added for accessibility */}
+                <SheetTitle className="sr-only">Ana Menü</SheetTitle>
                 <SheetClose asChild>
                   <Button variant="ghost" size="icon" className="text-foreground hover:text-primary">
                     <X className="h-6 w-6" />
@@ -238,13 +269,24 @@ export function Header() {
                   </Button>
                 </SheetClose>
               </SheetHeader>
-              <nav className="flex flex-col space-y-2 p-4 flex-grow overflow-y-auto">
+              <nav className="flex flex-col space-y-1 p-4 flex-grow overflow-y-auto">
                 <NavLinkItem href={mainNavLink.href} label={mainNavLink.label} icon={mainNavLink.icon} exact={true} isMobile={true}/>
 
-                <div> 
+                <div>
                   <NavLinkItem href={`/categories/${GENRES[0]}`} label="Kategoriler" icon={LayoutGrid} isMobile={true}/>
                   <div className="flex flex-col mt-1 space-y-0.5 pl-4 border-l-2 border-primary/20 ml-3">
-                    {GENRES.map(genre => <CategoryLinkItem key={genre} genre={genre} isMobile={true}/>)}
+                    {GENRES.map(genre => (
+                        <React.Fragment key={`${genre}-mobile`}>
+                            <CategoryLinkItem genre={genre} isMobile={true}/>
+                            {SUBGENRES_MAP[genre] && SUBGENRES_MAP[genre].length > 0 && (
+                                <div className="flex flex-col space-y-0.5">
+                                {SUBGENRES_MAP[genre].map(subGenre => (
+                                     <SubCategoryLinkItem key={`${subGenre.value}-mobile`} mainGenre={genre} subGenre={subGenre} isMobile={true} />
+                                ))}
+                                </div>
+                            )}
+                        </React.Fragment>
+                    ))}
                   </div>
                 </div>
 
@@ -262,3 +304,4 @@ export function Header() {
     </header>
   );
 }
+

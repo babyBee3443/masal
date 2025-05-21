@@ -5,7 +5,7 @@ import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { Menu, X, BookOpen, Home as HomeIcon, LayoutGrid, Sparkles, TrendingUp, FileText, ChevronDown } from 'lucide-react'; // HomeIcon olarak adlandırıldı, çakışmayı önlemek için
+import { Menu, X, BookOpen, Home as HomeIcon, LayoutGrid, Sparkles, TrendingUp, FileText, ChevronDown } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -24,17 +24,19 @@ import {
   SheetClose,
   SheetTrigger
 } from '@/components/ui/sheet';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"; // Accordion bileşenleri eklendi
 import { Logo } from '@/components/site/Logo';
 import { cn } from '@/lib/utils';
-import { APP_NAME, HIERARCHICAL_CATEGORIES_FOR_HEADER, GENRES as FALLBACK_GENRES, getGenreIcon } from '@/lib/constants'; // HIERARCHICAL_CATEGORIES_FOR_HEADER, getGenreIcon ve FALLBACK_GENRES eklendi
+import { APP_NAME, HIERARCHICAL_CATEGORIES_FOR_HEADER, GENRES as FALLBACK_GENRES, getGenreIcon } from '@/lib/constants';
 import type { StoryGenre } from '@/lib/types';
-
 
 const mainNavLink = { href: '/', label: 'Anasayfa', icon: HomeIcon };
 const adminPanelLink = { href: '/admin', label: 'Admin Paneli', icon: BookOpen };
-
-// GenreIcon bileşeni artık getGenreIcon fonksiyonunu kullanacak şekilde basitleştirilebilir veya doğrudan kullanılabilir.
-// Şimdilik getGenreIcon'u doğrudan kullanacağız.
 
 export function Header() {
   const pathname = usePathname();
@@ -46,10 +48,9 @@ export function Header() {
       setIsScrolled(window.scrollY > 10);
     };
     window.addEventListener('scroll', handleScroll);
-    handleScroll(); // initial check
+    handleScroll();
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-
 
   const NavLinkItem = ({ href, label, icon: Icon, exact = false, isMobile = false }: { href: string; label: string; icon: React.ElementType; exact?: boolean; isMobile?: boolean}) => {
     const isActive = (exact && pathname === href) || (!exact && href !== '/' && pathname.startsWith(href)) || (href === '/' && pathname === '/');
@@ -77,10 +78,8 @@ export function Header() {
     );
   };
 
-  // Mobil menü için alt kategori bağlantı bileşeni
   const MobileSubCategoryLinkItem = ({ themeValue, themeLabel, themeIcon: ThemeIcon }: { themeValue: string; themeLabel: string; themeIcon: React.ElementType; }) => {
     const href = `/categories/${themeValue}`;
-    // const isActive = pathname === href; // Alt kategoriler için aktif durum kontrolü şimdilik basit tutulabilir
     return (
       <Button
         variant="ghost"
@@ -97,7 +96,6 @@ export function Header() {
       </Button>
     );
   }
-
 
   return (
     <header className={cn(
@@ -129,44 +127,54 @@ export function Header() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
-              className="w-[880px] p-6 bg-card/90 backdrop-blur-xl border-2 border-primary/40 shadow-2xl rounded-2xl mt-3"
+              className="w-[880px] p-6 bg-card/95 backdrop-blur-xl border-2 border-primary/40 shadow-2xl rounded-2xl mt-3 overflow-y-auto"
+              style={{ maxHeight: 'calc(100vh - 10rem)' }} // Maksimum yükseklik ve dikey kaydırma
               sideOffset={15}
               align="center"
             >
               <div className="grid grid-cols-3 gap-x-8 gap-y-4">
-                {/* Sütun 1: Hiyerarşik Kategoriler */}
+                {/* Sütun 1: Hiyerarşik Kategoriler (Akordiyon ile) */}
                 <div className="space-y-1 col-span-1">
-                  <DropdownMenuLabel className="text-lg font-bold text-primary px-2 pb-2.5 mb-2 border-b-2 border-primary/25 flex items-center">
+                  <DropdownMenuLabel className="text-lg font-bold text-primary px-2 pb-2.5 mb-1 border-b-2 border-primary/25 flex items-center">
                     <Sparkles className="mr-2.5 h-5 w-5 text-accent"/>
                     Kategorilere Göz At
                   </DropdownMenuLabel>
-                  {HIERARCHICAL_CATEGORIES_FOR_HEADER.map((categoryGroup) => {
-                    const AudienceIcon = categoryGroup.audience.icon;
-                    return (
-                      <React.Fragment key={categoryGroup.audience.value}>
-                        <DropdownMenuLabel className="flex items-center text-md font-semibold text-foreground/90 px-1 py-2 mt-1">
-                          <AudienceIcon className="mr-2 h-5 w-5 text-primary/80" />
-                          {categoryGroup.audience.label}
-                        </DropdownMenuLabel>
-                        <div className="flex flex-col pl-4 space-y-0.5 mb-1.5 border-l-2 border-primary/10 ml-2">
-                          {categoryGroup.themes.map(theme => {
-                            const ThemeIcon = theme.icon;
-                            return(
-                              <DropdownMenuItem key={theme.value + categoryGroup.audience.value} asChild className="p-0 group focus:bg-accent/10 rounded-md">
-                                <Link href={`/categories/${theme.value}?audience=${categoryGroup.audience.value}`} className="flex items-center w-full px-2 py-1.5 text-sm rounded-md text-foreground/80 hover:bg-accent/10 hover:text-accent transition-colors duration-200">
-                                  <ThemeIcon className="h-4 w-4 mr-2 text-accent/70 group-hover:text-primary transition-colors" />
-                                  <span className="font-medium">{theme.label}</span>
-                                </Link>
-                              </DropdownMenuItem>
-                            );
-                          })}
-                        </div>
-                      </React.Fragment>
-                    );
-                  })}
+                  <Accordion type="single" collapsible className="w-full">
+                    {HIERARCHICAL_CATEGORIES_FOR_HEADER.map((categoryGroup) => {
+                      const AudienceIcon = categoryGroup.audience.icon;
+                      return (
+                        <AccordionItem value={categoryGroup.audience.value} key={categoryGroup.audience.value} className="border-b-0 mb-1">
+                          <AccordionTrigger className="text-md font-semibold text-foreground/90 px-2 py-2 hover:bg-accent/10 rounded-md w-full justify-between hover:no-underline">
+                            <div className="flex items-center">
+                              <AudienceIcon className="mr-2 h-5 w-5 text-primary/80" />
+                              {categoryGroup.audience.label}
+                            </div>
+                          </AccordionTrigger>
+                          <AccordionContent className="pt-1 pb-0 pl-3">
+                            <div className="flex flex-col space-y-0.5 mt-1 mb-1.5 border-l-2 border-primary/20 ml-3 pl-3">
+                              {categoryGroup.themes.map(theme => {
+                                const ThemeIcon = theme.icon;
+                                return(
+                                  <DropdownMenuItem key={theme.value + categoryGroup.audience.value} asChild className="p-0 group focus:bg-accent/5 rounded-md">
+                                    <Link 
+                                      href={`/categories/${theme.value}?audience=${categoryGroup.audience.value}`} 
+                                      className="flex items-center w-full px-2 py-1.5 text-sm rounded-md text-foreground/80 hover:bg-accent/5 hover:text-accent transition-colors duration-200"
+                                    >
+                                      <ThemeIcon className="h-4 w-4 mr-2 text-accent/70 group-hover:text-primary transition-colors" />
+                                      <span className="font-medium">{theme.label}</span>
+                                    </Link>
+                                  </DropdownMenuItem>
+                                );
+                              })}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      );
+                    })}
+                  </Accordion>
                 </div>
 
-                {/* Sütun 2: Öne Çıkan Masal (Yer Tutucu) */}
+                {/* Sütun 2: Öne Çıkan Masal */}
                 <div className="space-y-3">
                   <DropdownMenuLabel className="text-lg font-bold text-primary px-2 pb-2.5 mb-3 border-b-2 border-primary/25 flex items-center">
                      <TrendingUp className="mr-2.5 h-5 w-5 text-accent"/>
@@ -188,7 +196,7 @@ export function Header() {
                   </div>
                 </div>
 
-                {/* Sütun 3: Popüler Masallar (Yer Tutucu) */}
+                {/* Sütun 3: Popüler Masallar */}
                 <div className="space-y-2">
                   <DropdownMenuLabel className="text-lg font-bold text-primary px-2 pb-2.5 mb-3 border-b-2 border-primary/25 flex items-center">
                      <BookOpen className="mr-2.5 h-5 w-5 text-accent"/>
@@ -214,7 +222,7 @@ export function Header() {
               <div className="text-center">
                 <Button variant="outline" asChild size="lg" className="w-full md:w-auto text-primary hover:text-accent hover:border-accent transition-colors duration-200 py-3 border-primary/60 hover:bg-primary/5">
                   <Link href={`/categories/${FALLBACK_GENRES[0]}`}>
-                    Tüm Temaları Gör
+                    Tüm Temaları Gör {/* Bu link ileride daha genel bir kategori listeleme sayfasına gidebilir */}
                   </Link>
                 </Button>
               </div>
@@ -237,7 +245,7 @@ export function Header() {
                 <Link href="/" onClick={() => setIsMobileMenuOpen(false)}>
                   <Logo className="h-9 w-auto" />
                 </Link>
-                <SheetTitle className="sr-only">Ana Menü</SheetTitle> {/* sr-only eklendi */}
+                <SheetTitle className="sr-only">Ana Menü</SheetTitle>
                 <SheetClose asChild>
                   <Button variant="ghost" size="icon" className="text-foreground hover:text-primary">
                     <X className="h-6 w-6" />
@@ -248,32 +256,20 @@ export function Header() {
               <nav className="flex flex-col space-y-1 p-4 flex-grow overflow-y-auto">
                 <NavLinkItem href={mainNavLink.href} label={mainNavLink.label} icon={mainNavLink.icon} exact={true} isMobile={true}/>
 
-                <div>
-                    <Button
-                        variant="ghost"
-                        className={cn(
-                            "justify-start text-lg font-medium transition-all duration-200 ease-out w-full py-3",
-                            pathname.startsWith('/categories') ? "text-primary font-semibold" : "text-foreground/70 hover:text-primary"
-                        )}
-                        onClick={(e) => {
-                            // Kategori sayfasına yönlendir ama mobil menüyü kapat.
-                            // Veya bir alt menü açma mantığı eklenebilir. Şimdilik ilk ana kategoriye yönlendirelim.
-                            // Veya tıklamayı engelleyip sadece alt menüleri gösterelim.
-                            // Şimdilik, ilk kategoriye yönlendirme veya sadece başlık olarak kalma.
-                            e.preventDefault(); // Tıklamayı engelle, alt menüyü göster
-                        }}
-                    >
-                        <LayoutGrid className="mr-2 h-6 w-6" />
-                        Kategoriler
-                    </Button>
-                  <div className="flex flex-col mt-1 space-y-0.5 pl-4 border-l-2 border-primary/20 ml-3">
-                    {HIERARCHICAL_CATEGORIES_FOR_HEADER.map(categoryGroup => (
-                      <React.Fragment key={`${categoryGroup.audience.value}-mobile`}>
-                        <div className="flex items-center text-md font-semibold text-foreground/80 px-1 py-1.5 mt-1">
-                           {React.createElement(categoryGroup.audience.icon, { className: "mr-2 h-5 w-5 text-primary/70" })}
-                           {categoryGroup.audience.label}
-                        </div>
-                        <div className="flex flex-col space-y-0.5 pl-2">
+                {/* Mobil Menüde Akordiyon */}
+                <Accordion type="single" collapsible className="w-full">
+                  {HIERARCHICAL_CATEGORIES_FOR_HEADER.map(categoryGroup => {
+                    const AudienceIcon = categoryGroup.audience.icon;
+                    return (
+                      <AccordionItem value={categoryGroup.audience.value} key={`${categoryGroup.audience.value}-mobile`} className="border-b border-border/50 py-1">
+                        <AccordionTrigger className="text-lg font-medium text-foreground/70 hover:text-primary py-3 hover:no-underline w-full justify-between">
+                           <div className="flex items-center">
+                            <AudienceIcon className="mr-2 h-6 w-6" />
+                            {categoryGroup.audience.label}
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="pt-1 pb-0 pl-2">
+                           <div className="flex flex-col space-y-0.5 mt-1">
                             {categoryGroup.themes.map(theme => (
                                 <MobileSubCategoryLinkItem 
                                     key={`${theme.value}-${categoryGroup.audience.value}-mobile`}
@@ -282,12 +278,13 @@ export function Header() {
                                     themeIcon={theme.icon}
                                 />
                             ))}
-                        </div>
-                      </React.Fragment>
-                    ))}
-                  </div>
-                </div>
-
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    );
+                  })}
+                </Accordion>
+                
                  <NavLinkItem href={adminPanelLink.href} label={adminPanelLink.label} icon={adminPanelLink.icon} isMobile={true}/>
               </nav>
                <div className="p-4 border-t border-border/30 mt-auto">
@@ -302,3 +299,4 @@ export function Header() {
     </header>
   );
 }
+
